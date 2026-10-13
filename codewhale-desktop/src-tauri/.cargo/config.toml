@@ -1,0 +1,3 @@
+# Build artifacts go to the D: drive: the C: drive is low on space.
+[build]
+target-dir = "D:/AI/build/codewhale-desktop-target"
