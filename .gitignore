@@ -1,0 +1,2 @@
+# CodeWhale agent runtime state (locks are per-process)
+.codewhale/state/*.lock
