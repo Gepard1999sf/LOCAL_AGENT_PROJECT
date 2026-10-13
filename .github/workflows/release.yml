@@ -1,0 +1,340 @@
+# Release build of CodeWhale Desktop: Windows installers (NSIS *-setup.exe and MSI).
+#
+# Triggers:
+#   push of a tag vX.Y.Z  - builds the installers with app version X.Y.Z and publishes
+#                           them on the GitHub Release for that tag (created if missing).
+#   workflow_dispatch     - builds the same installers and attaches them to the run
+#                           (Actions -> run -> Artifacts). Started on a tag ("Use workflow
+#                           from: vX.Y.Z") it publishes the Release as well.
+#
+# The CodeWhale runtime (MIT, https://github.com/codewhale-hq/codewhale) is downloaded
+# from its GitHub Release, checked against the release's codewhale-artifacts-sha256.txt
+# manifest (and a pinned hash for the default version) and bundled as the Tauri sidecar
+# src-tauri/binaries/codewhale-app-server-x86_64-pc-windows-msvc.exe.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      codewhale_version:
+        description: "CodeWhale version to bundle (upstream release tag without the leading v)"
+        required: true
+        # Keep in sync with CODEWHALE_DEFAULT_VERSION below.
+        default: "0.10.1"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: "22"
+  CODEWHALE_REPO: codewhale-hq/codewhale
+  CODEWHALE_ASSET: codewhale-windows-x64.exe
+  # Bundled CodeWhale version for tag builds, and the SHA-256 of its codewhale-windows-x64.exe
+  # (from https://github.com/codewhale-hq/codewhale/releases/download/v0.10.1/codewhale-artifacts-sha256.txt).
+  # The pinned hash is checked in addition to the release manifest whenever this version is built.
+  CODEWHALE_DEFAULT_VERSION: "0.10.1"
+  CODEWHALE_DEFAULT_SHA256: "76a6156baa8be350d12cb3d5d049ce1d796597da8475470d3179b51d47d22729"
+  SIDECAR_TRIPLE: x86_64-pc-windows-msvc
+
+jobs:
+  windows:
+    name: Windows installers
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      # Overrides any build.target-dir from a developer's .cargo/config.toml, so the
+      # bundles land where rust-cache and the steps below expect them.
+      CARGO_TARGET_DIR: ${{ github.workspace }}\codewhale-desktop\src-tauri\target
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Resolve versions
+        id: meta
+        env:
+          INPUT_CODEWHALE_VERSION: ${{ inputs.codewhale_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $cw = $env:INPUT_CODEWHALE_VERSION
+          if ([string]::IsNullOrWhiteSpace($cw)) { $cw = $env:CODEWHALE_DEFAULT_VERSION }
+          $cw = $cw.Trim().TrimStart('v')
+          if ($cw -notmatch '^\d+\.\d+\.\d+$') {
+            Write-Host "::error title=Bad CodeWhale version::'$cw' is not X.Y.Z"
+            exit 1
+          }
+
+          $release = 'false'; $tag = ''; $prerelease = 'false'
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            # MSI accepts only X.Y.Z or X.Y.Z-N (numeric pre-release, N <= 65535).
+            if ($env:GITHUB_REF_NAME -notmatch '^v(\d+\.\d+\.\d+(-\d+)?)$') {
+              Write-Host "::error title=Bad tag::Tag '$($env:GITHUB_REF_NAME)' must look like v1.2.3 (or v1.2.3-1 for a pre-release)"
+              exit 1
+            }
+            $appVersion = $Matches[1]
+            $release = 'true'
+            $tag = $env:GITHUB_REF_NAME
+            if ($appVersion.Contains('-')) { $prerelease = 'true' }
+          } else {
+            $conf = Get-Content -Raw -LiteralPath 'codewhale-desktop/src-tauri/tauri.conf.json' | ConvertFrom-Json
+            $appVersion = [string]$conf.version
+          }
+
+          Write-Host "App version:       $appVersion"
+          Write-Host "CodeWhale version: $cw"
+          Write-Host "Publish release:   $release $tag"
+          @(
+            "release=$release"
+            "tag=$tag"
+            "prerelease=$prerelease"
+            "app_version=$appVersion"
+            "codewhale_version=$cw"
+          ) | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: codewhale-desktop/package-lock.json
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: codewhale-desktop/src-tauri -> target
+          # A cache saved under a tag ref is visible only to that tag, so only branch runs
+          # (manual runs on main) save one; tag builds restore it.
+          save-if: ${{ github.ref_type != 'tag' }}
+
+      - name: Install frontend dependencies
+        working-directory: codewhale-desktop
+        run: npm ci
+
+      - name: Download CodeWhale ${{ steps.meta.outputs.codewhale_version }}
+        env:
+          CW_VERSION: ${{ steps.meta.outputs.codewhale_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $hostLine = rustc -vV | Where-Object { $_ -like 'host:*' } | Select-Object -First 1
+          $triple = ($hostLine -replace '^host:\s*', '').Trim()
+          if ($triple -ne $env:SIDECAR_TRIPLE) {
+            Write-Host "::error::Host triple is '$triple', but the bundled CodeWhale asset is built for $($env:SIDECAR_TRIPLE)"
+            exit 1
+          }
+
+          $base = "https://github.com/$($env:CODEWHALE_REPO)/releases/download/v$($env:CW_VERSION)"
+          $dir = Join-Path $env:RUNNER_TEMP 'codewhale'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          $exe = Join-Path $dir $env:CODEWHALE_ASSET
+          $manifest = Join-Path $dir 'codewhale-artifacts-sha256.txt'
+
+          foreach ($pair in @(@("$base/$($env:CODEWHALE_ASSET)", $exe), @("$base/codewhale-artifacts-sha256.txt", $manifest))) {
+            Write-Host "GET $($pair[0])"
+            curl.exe --fail --silent --show-error --location --retry 5 --retry-delay 5 --retry-all-errors --output $pair[1] $pair[0]
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "::error title=Download failed::$($pair[0]) (curl exit $LASTEXITCODE)"
+              exit 1
+            }
+          }
+
+          # Manifest lines: "<sha256>  <asset name>" (same format the codewhale npm installer parses).
+          $expected = $null
+          foreach ($line in Get-Content -LiteralPath $manifest) {
+            if ($line.Trim() -match '^([a-fA-F0-9]{64})\s+\*?(.+)$' -and $Matches[2].Trim() -eq $env:CODEWHALE_ASSET) {
+              $expected = $Matches[1].ToLowerInvariant()
+            }
+          }
+          if (-not $expected) {
+            Write-Host "::error title=Checksum missing::codewhale-artifacts-sha256.txt has no entry for $($env:CODEWHALE_ASSET)"
+            exit 1
+          }
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $exe).Hash.ToLowerInvariant()
+          Write-Host "SHA-256 expected: $expected"
+          Write-Host "SHA-256 actual:   $actual"
+          if ($actual -ne $expected) {
+            Write-Host "::error title=Checksum mismatch::$($env:CODEWHALE_ASSET) does not match the release manifest"
+            exit 1
+          }
+          if ($env:CW_VERSION -eq $env:CODEWHALE_DEFAULT_VERSION -and $actual -ne $env:CODEWHALE_DEFAULT_SHA256) {
+            Write-Host "::error title=Checksum mismatch::$($env:CODEWHALE_ASSET) v$($env:CW_VERSION) does not match the hash pinned in release.yml"
+            exit 1
+          }
+
+          $binDir = 'codewhale-desktop/src-tauri/binaries'
+          New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+          $sidecar = Join-Path $binDir "codewhale-app-server-$triple.exe"
+          Copy-Item -LiteralPath $exe -Destination $sidecar -Force
+          $mb = [math]::Round((Get-Item -LiteralPath $sidecar).Length / 1MB, 1)
+          Write-Host "Sidecar: $sidecar ($mb MB)"
+
+      - name: Check CodeWhale binary
+        timeout-minutes: 5
+        env:
+          CW_VERSION: ${{ steps.meta.outputs.codewhale_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sidecar = Join-Path $env:GITHUB_WORKSPACE "codewhale-desktop\src-tauri\binaries\codewhale-app-server-$($env:SIDECAR_TRIPLE).exe"
+
+          $out = (& $sidecar --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::'codewhale --version' exited with $LASTEXITCODE"
+            exit 1
+          }
+          Write-Host "codewhale --version: $out"
+          if ($out -notmatch [regex]::Escape($env:CW_VERSION)) {
+            Write-Host "::warning::'codewhale --version' does not mention $($env:CW_VERSION)"
+          }
+
+          # The desktop app starts `<sidecar> app-server --http --host 127.0.0.1 --port N`.
+          $help = (& $sidecar app-server --help | Out-String)
+          if ($LASTEXITCODE -ne 0 -or $help -notmatch '--http') {
+            Write-Host "::error::This CodeWhale build has no 'app-server --http' mode"
+            exit 1
+          }
+          Write-Host "app-server --http: OK"
+
+      - name: Prepare Tauri config overlays
+        id: conf
+        working-directory: codewhale-desktop
+        env:
+          RELEASE: ${{ steps.meta.outputs.release }}
+          APP_VERSION: ${{ steps.meta.outputs.app_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # bundle.externalBin lives in an overlay so `tauri dev` and cargo checks do not need
+          # the 128 MB sidecar. Recreate the overlay here if the checkout does not have it.
+          $bundleConf = 'src-tauri/tauri.bundle.conf.json'
+          if (Test-Path -LiteralPath $bundleConf) {
+            $bins = @((Get-Content -Raw -LiteralPath $bundleConf | ConvertFrom-Json).bundle.externalBin)
+            if ($bins -notcontains 'binaries/codewhale-app-server') {
+              Write-Host "::warning file=codewhale-desktop/$bundleConf::bundle.externalBin does not list binaries/codewhale-app-server"
+            }
+          } else {
+            Write-Host "::warning::$bundleConf is not in the repository; creating it for this build"
+            $json = '{ "bundle": { "externalBin": ["binaries/codewhale-app-server"] } }'
+            [System.IO.File]::WriteAllText((Join-Path $PWD $bundleConf), $json)
+          }
+          $tauriArgs = "--config $bundleConf"
+
+          # Tag builds: the app and installer version follow the tag (CI workspace only).
+          if ($env:RELEASE -eq 'true') {
+            $versionConf = 'src-tauri/tauri.release.conf.json'
+            $json = (@{ version = $env:APP_VERSION } | ConvertTo-Json -Compress)
+            [System.IO.File]::WriteAllText((Join-Path $PWD $versionConf), $json)
+            Write-Host "$versionConf -> $json"
+            $tauriArgs += " --config $versionConf"
+          }
+
+          Write-Host "tauri build args: $tauriArgs"
+          "args=$tauriArgs" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Build installers (and publish the release on tags)
+        id: tauri
+        uses: tauri-apps/tauri-action@v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: codewhale-desktop
+          args: ${{ steps.conf.outputs.args }}
+          # Empty on non-tag runs: the action then only builds and uploads nothing.
+          tagName: ${{ steps.meta.outputs.tag }}
+          releaseName: CodeWhale Desktop v__VERSION__
+          releaseDraft: false
+          prerelease: ${{ steps.meta.outputs.prerelease }}
+          releaseAssetNamePattern: CodeWhale-Desktop_[version]_[arch][setup][ext]
+          uploadUpdaterJson: false
+          retryAttempts: 1
+          releaseBody: |
+            ## Как установить
+
+            1. Ниже, в разделе **Assets**, скачайте **`CodeWhale-Desktop_${{ steps.meta.outputs.app_version }}_x64-setup.exe`**. Это обычный установщик (NSIS): программа ставится только для вашей учётной записи, права администратора не нужны.
+               Другой вариант — **`CodeWhale-Desktop_${{ steps.meta.outputs.app_version }}_x64.msi`**: установка для всех пользователей компьютера, Windows попросит права администратора.
+            2. Запустите скачанный файл. Установщик не подписан цифровой подписью, поэтому Windows SmartScreen покажет окно «Система Windows защитила ваш компьютер». Нажмите **«Подробнее»**, затем **«Выполнить в любом случае»**.
+            3. Если на компьютере нет Microsoft Edge WebView2, установщик сам скачает и установит его (нужен интернет).
+            4. **Ollama ставится отдельно**: скачайте её с https://ollama.com/download или выполните в PowerShell `winget install Ollama.Ollama`. Затем скачайте модель командой `ollama pull <модель>`.
+
+            Агент CodeWhale ${{ steps.meta.outputs.codewhale_version }} уже встроен в установщик, ставить его через npm не нужно.
+
+            Подробная инструкция (обновление, удаление, где лежат настройки): ${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/docs/INSTALL.md
+
+      - name: Collect installers
+        id: files
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+          APP_VERSION: ${{ steps.meta.outputs.app_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $paths = @($env:ARTIFACT_PATHS | ConvertFrom-Json)
+          $setup = $paths | Where-Object { $_ -like '*-setup.exe' } | Select-Object -First 1
+          $msi = $paths | Where-Object { $_ -like '*.msi' } | Select-Object -First 1
+          if (-not $setup) {
+            Write-Host "::error::No NSIS *-setup.exe among: $($env:ARTIFACT_PATHS)"
+            exit 1
+          }
+
+          # upload-artifact with archive: false names each artifact after its file.
+          $out = Join-Path $env:RUNNER_TEMP 'installers'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $setupOut = Join-Path $out "CodeWhale-Desktop_$($env:APP_VERSION)_x64-setup.exe"
+          Copy-Item -LiteralPath $setup -Destination $setupOut -Force
+          $files = @($setupOut)
+          $msiOut = ''
+          if ($msi) {
+            $msiOut = Join-Path $out "CodeWhale-Desktop_$($env:APP_VERSION)_x64.msi"
+            Copy-Item -LiteralPath $msi -Destination $msiOut -Force
+            $files += $msiOut
+          } else {
+            Write-Host "::warning::No .msi was built (bundle.targets without msi?)"
+          }
+
+          $summary = @("## CodeWhale Desktop $($env:APP_VERSION)", '', '| Файл | Размер | SHA-256 |', '| --- | --- | --- |')
+          foreach ($f in $files) {
+            $item = Get-Item -LiteralPath $f
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $f).Hash.ToLowerInvariant()
+            $summary += "| ``$($item.Name)`` | $([math]::Round($item.Length / 1MB, 1)) MB | ``$hash`` |"
+            Write-Host "$($item.Name)  $hash"
+          }
+          $summary += ''
+          $summary += 'Установщики приложены к этому запуску в разделе **Artifacts** (и к GitHub Release, если сборка запущена тегом).'
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+          "setup=$setupOut" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          "msi=$msiOut" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Upload NSIS installer to the run
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.files.outputs.setup }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload MSI installer to the run
+        if: steps.files.outputs.msi != ''
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.files.outputs.msi }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30

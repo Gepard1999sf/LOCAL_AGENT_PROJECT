@@ -1,0 +1,61 @@
+{
+  "endpoint": "GET /v1/threads/{id}/events",
+  "phase": "mock",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_92ca174880704175aa1911ac8ae99ea6/events?replay_limit=4096&progress=true&since_seq=1000000000",
+    "auth": true
+  },
+  "status": 200,
+  "response_headers": {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    "x-codewhale-stream-end": "1"
+  },
+  "events": [
+    {
+      "event": "stream.progress",
+      "id": null,
+      "data": {
+        "schema_version": 1,
+        "event": "stream.progress",
+        "kind": "stream.progress",
+        "thread_id": "thr_92ca174880704175aa1911ac8ae99ea6",
+        "seq": 1000000000,
+        "state": "replaying"
+      }
+    },
+    {
+      "event": "stream.progress",
+      "id": null,
+      "data": {
+        "schema_version": 1,
+        "event": "stream.progress",
+        "kind": "stream.progress",
+        "thread_id": "thr_92ca174880704175aa1911ac8ae99ea6",
+        "seq": 1000000000,
+        "state": "live"
+      }
+    },
+    {
+      "event": "stream.end",
+      "id": null,
+      "data": {
+        "schema_version": 1,
+        "event": "stream.end",
+        "kind": "stream.end",
+        "thread_id": "thr_92ca174880704175aa1911ac8ae99ea6",
+        "reason": "runtime_shutdown",
+        "last_seq": 1000000000,
+        "retryable": true
+      }
+    }
+  ],
+  "event_names": [
+    "stream.progress",
+    "stream.progress",
+    "stream.end"
+  ],
+  "recorded_at": "2026-10-13T21:33:46+00:00",
+  "note": "SSE open (since_seq far ahead, so no replay) when the server receives SIGINT."
+}

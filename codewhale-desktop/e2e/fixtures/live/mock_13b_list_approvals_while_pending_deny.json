@@ -1,0 +1,26 @@
+{
+  "endpoint": "GET /v1/approvals",
+  "phase": "mock",
+  "request": {
+    "method": "GET",
+    "path": "/v1/approvals",
+    "auth": true,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": [
+      {
+        "approval_id": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+        "tool_name": "bash",
+        "summary": "echo hi-from-bash",
+        "outcome": "pending",
+        "asked_at": "2026-10-13T21:30:16.713473639Z",
+        "decided_at": null
+      }
+    ]
+  },
+  "elapsed_ms": 3,
+  "recorded_at": "2026-10-13T21:30:17+00:00"
+}

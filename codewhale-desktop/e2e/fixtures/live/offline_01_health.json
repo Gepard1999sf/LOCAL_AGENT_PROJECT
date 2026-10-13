@@ -1,0 +1,21 @@
+{
+  "endpoint": "GET /health",
+  "phase": "offline",
+  "request": {
+    "method": "GET",
+    "path": "/health",
+    "auth": false,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "status": "ok",
+      "service": "codewhale-runtime-api",
+      "mode": "local"
+    }
+  },
+  "elapsed_ms": 6,
+  "recorded_at": "2026-10-13T21:28:37+00:00"
+}

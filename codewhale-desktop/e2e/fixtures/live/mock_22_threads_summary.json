@@ -1,0 +1,82 @@
+{
+  "endpoint": "GET /v1/threads/summary",
+  "phase": "mock",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/summary?limit=300",
+    "auth": true,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": [
+      {
+        "id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "title": "Говори медленно [slow]",
+        "preview": "медленно ",
+        "model": "qwen3:4b",
+        "mode": "agent",
+        "workspace": "/work/demo-project",
+        "branch": null,
+        "head": null,
+        "dirty": true,
+        "archived": false,
+        "updated_at": "2026-10-13T21:30:22.642731026Z",
+        "latest_turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "latest_turn_status": "interrupted",
+        "pending_attention_count": 0
+      },
+      {
+        "id": "thr_66897057f8ab4643be149a7d962d9407",
+        "title": "Тестовая сессия",
+        "preview": "Привет! Ответь одним словом.",
+        "model": "qwen3:0.6b",
+        "mode": "agent",
+        "workspace": "/work/demo-project",
+        "branch": null,
+        "head": null,
+        "dirty": true,
+        "archived": false,
+        "updated_at": "2026-10-13T21:29:06.882443279Z",
+        "latest_turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+        "latest_turn_status": "failed",
+        "pending_attention_count": 0
+      },
+      {
+        "id": "thr_963d7ebe45bd4569abdebd205c4ec401",
+        "title": "Тестовая сессия",
+        "preview": "Тестовая сессия",
+        "model": "qwen3:0.6b",
+        "mode": "agent",
+        "workspace": "/work/demo-project",
+        "branch": null,
+        "head": null,
+        "dirty": true,
+        "archived": false,
+        "updated_at": "2026-10-13T21:28:37.916478839Z",
+        "latest_turn_id": null,
+        "latest_turn_status": null,
+        "pending_attention_count": 0
+      },
+      {
+        "id": "thr_237c47944dc54b34a2144c48015a65e4",
+        "title": "New Thread",
+        "preview": "New Thread",
+        "model": "qwen3:4b",
+        "mode": "agent",
+        "workspace": "/work/demo-project",
+        "branch": null,
+        "head": null,
+        "dirty": true,
+        "archived": false,
+        "updated_at": "2026-10-13T21:28:37.510814166Z",
+        "latest_turn_id": null,
+        "latest_turn_status": null,
+        "pending_attention_count": 0
+      }
+    ]
+  },
+  "elapsed_ms": 31,
+  "recorded_at": "2026-10-13T21:30:24+00:00"
+}

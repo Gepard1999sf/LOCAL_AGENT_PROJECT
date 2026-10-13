@@ -18,7 +18,7 @@ import { useThreads, type Approval, type ItemView } from "../../store/threads";
 import { primaryArg, toolMeta } from "../../lib/tools";
 import { fmtTimeSec, fmtDuration } from "../../lib/format";
 import { Markdown } from "./Markdown";
-import { DiffView, diffStats, looksLikeDiff } from "./DiffView";
+import { DiffView, diffStats, looksLikeDiff, type DiffLine } from "./DiffView";
 import { Button } from "../ui/primitives";
 import { useApp } from "../../store/app";
 
@@ -172,17 +172,16 @@ function ArgsPreview({ name, args }: { name?: string; args?: Record<string, unkn
   const newS = (args.new_string ?? args.new_str ?? args.replace) as string | undefined;
   if (command) return <pre className="whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-[12px] text-fg">{command}</pre>;
   if (path && oldS != null && newS != null) {
-    const diff = [
-      "--- a/" + path,
-      "+++ b/" + path,
-      "@@ -1 +1 @@",
-      ...oldS.split("\n").map((l) => "-" + l),
-      ...newS.split("\n").map((l) => "+" + l),
-    ].join("\n");
+    // A search/replace pair, not a diff: where it lands in the file is unknown, so no hunk header or line numbers.
+    const split = (s: string) => (s === "" ? [] : s.split("\n"));
+    const lines: DiffLine[] = [
+      ...split(oldS).map((text) => ({ type: "del" as const, text })),
+      ...split(newS).map((text) => ({ type: "add" as const, text })),
+    ];
     return (
       <>
         <div className="px-2.5 pt-1.5 font-mono text-[12px] text-fg2">{path}</div>
-        <DiffView text={diff} maxHeight={260} />
+        <DiffView lines={lines} maxHeight={260} />
       </>
     );
   }

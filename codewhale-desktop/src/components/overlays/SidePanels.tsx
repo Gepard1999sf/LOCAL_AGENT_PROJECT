@@ -7,7 +7,12 @@ import { api } from "../../lib/tauri";
 import { SHORTCUTS } from "../../lib/shortcuts";
 import { fmtBytes, fmtTokens } from "../../lib/format";
 import { Button, IconButton } from "../ui/primitives";
+import { effectiveCtx } from "../../lib/models";
 import { ModelBadges } from "../layout/Toolbar";
+
+function openLink(url: string) {
+  openUrl(url).catch((e) => toast.error("Не удалось открыть ссылку", { description: String(e) }));
+}
 
 function Panel({ title, children, width = 400 }: { title: React.ReactNode; children: React.ReactNode; width?: number }) {
   const setOverlay = useApp((s) => s.setOverlay);
@@ -69,8 +74,8 @@ export function AboutPanel() {
           {gpu && <div>GPU: {gpu.name}, {((gpu.memTotalMb ?? 0) / 1024).toFixed(0)} ГБ</div>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => openUrl("https://github.com/codewhale-hq/Codewhale")}>CodeWhale на GitHub</Button>
-          <Button onClick={() => openUrl("https://docs.ollama.com")}>Документация Ollama</Button>
+          <Button onClick={() => openLink("https://github.com/codewhale-hq/Codewhale")}>CodeWhale на GitHub</Button>
+          <Button onClick={() => openLink("https://docs.ollama.com")}>Документация Ollama</Button>
         </div>
       </div>
     </Panel>
@@ -202,7 +207,9 @@ export function ModelsPanel() {
       <div className="px-2 pb-4">
         {models.map((m) => {
           const loaded = ollama?.loaded?.find((l) => l.name === m.name || l.model === m.name);
-          const ctxOk = (m.numCtx ?? 0) >= 16384;
+          const effCtx = effectiveCtx(m);
+          const ctxOk = (effCtx ?? 0) >= 16384;
+          const ctxOptions = CTX_OPTIONS.filter((c) => !m.nativeCtx || c <= m.nativeCtx);
           return (
             <div key={m.name} className={`mb-1.5 rounded-[var(--radius-md)] border px-3 py-2 ${m.name === current ? "border-blue" : "border-line"}`}>
               <div className="flex items-center gap-2">
@@ -215,7 +222,7 @@ export function ModelsPanel() {
                 <span>{m.quantization}</span>
                 <span>{fmtBytes(m.size)}</span>
                 <span className={ctxOk || m.embedding ? "" : "text-yellow"}>
-                  контекст {m.numCtx ? fmtTokens(m.numCtx) : "4k (по умолч.)"}
+                  контекст {effCtx ? fmtTokens(effCtx) : "4k (по умолч.)"}
                   {m.nativeCtx ? ` из ${fmtTokens(m.nativeCtx)}` : ""}
                 </span>
                 {loaded && (
@@ -232,8 +239,15 @@ export function ModelsPanel() {
                       Использовать
                     </Button>
                   )}
-                  {!ctxOk && m.capabilities.includes("tools") && (
-                    <Button className="px-2 py-0.5 text-[12px]" onClick={() => setVariantFor(variantFor === m.name ? null : m.name)}>
+                  {!ctxOk && m.capabilities.includes("tools") && ctxOptions.length > 0 && (
+                    <Button
+                      className="px-2 py-0.5 text-[12px]"
+                      onClick={() => {
+                        // Keep the selected size within what this model supports.
+                        if (!ctxOptions.includes(ctx)) setCtx(ctxOptions.includes(32768) ? 32768 : ctxOptions[ctxOptions.length - 1]);
+                        setVariantFor(variantFor === m.name ? null : m.name);
+                      }}
+                    >
                       <HardDriveDownload size={12} /> Сделать версию с большим контекстом
                     </Button>
                   )}
@@ -242,9 +256,13 @@ export function ModelsPanel() {
                       variant="ghost"
                       className="px-2 py-0.5 text-[12px]"
                       onClick={async () => {
-                        await api.ollamaUnload(m.name);
+                        try {
+                          await api.ollamaUnload(m.name);
+                          toast.success("Модель выгружена из видеопамяти");
+                        } catch (e) {
+                          toast.error("Не удалось выгрузить модель", { description: String(e) });
+                        }
                         refreshOllama();
-                        toast.success("Модель выгружена из видеопамяти");
                       }}
                     >
                       <Power size={12} /> Выгрузить из VRAM
@@ -259,7 +277,7 @@ export function ModelsPanel() {
                     value={ctx}
                     onChange={(e) => setCtx(Number(e.target.value))}
                   >
-                    {CTX_OPTIONS.filter((c) => !m.nativeCtx || c <= m.nativeCtx).map((c) => (
+                    {ctxOptions.map((c) => (
                       <option key={c} value={c}>
                         {fmtTokens(c)}
                       </option>

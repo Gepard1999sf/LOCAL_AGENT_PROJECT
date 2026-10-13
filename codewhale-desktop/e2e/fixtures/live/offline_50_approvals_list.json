@@ -1,0 +1,17 @@
+{
+  "endpoint": "GET /v1/approvals",
+  "phase": "offline",
+  "request": {
+    "method": "GET",
+    "path": "/v1/approvals",
+    "auth": true,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": []
+  },
+  "elapsed_ms": 1,
+  "recorded_at": "2026-10-13T21:29:08+00:00"
+}

@@ -1,0 +1,654 @@
+{
+  "endpoint": "GET /v1/threads/{id}/events",
+  "phase": "mock",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_0a36e0abf43743d9946e29654d7d448e/events?replay_limit=4096&progress=true&since_seq=151",
+    "auth": true
+  },
+  "status": 200,
+  "response_headers": {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    "x-codewhale-stream-end": "1"
+  },
+  "events": [
+    {
+      "event": "stream.progress",
+      "id": null,
+      "data": {
+        "schema_version": 1,
+        "event": "stream.progress",
+        "kind": "stream.progress",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "seq": 151,
+        "state": "replaying"
+      }
+    },
+    {
+      "event": "stream.progress",
+      "id": null,
+      "data": {
+        "schema_version": 1,
+        "event": "stream.progress",
+        "kind": "stream.progress",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "seq": 151,
+        "state": "live"
+      }
+    },
+    {
+      "event": "turn.started",
+      "id": "152",
+      "data": {
+        "schema_version": 1,
+        "seq": 152,
+        "event": "turn.started",
+        "kind": "turn.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:19.989305371+00:00",
+        "created_at": "2026-10-13T21:30:19.989305371+00:00",
+        "payload": {
+          "turn": {
+            "schema_version": 2,
+            "id": "turn_bd690984454e45c18ece169e1e5a05c5",
+            "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+            "status": "in_progress",
+            "input_summary": "Говори медленно [slow]",
+            "created_at": "2026-10-13T21:30:19.955770862Z",
+            "started_at": "2026-10-13T21:30:19.955770862Z",
+            "routing_settlement": false,
+            "permission_posture": "ask",
+            "mode": "agent",
+            "effective_provider": "ollama",
+            "effective_provider_id": "ollama",
+            "effective_model": "qwen3:4b",
+            "item_ids": [
+              "item_fa66cabfd5d847aca92b8494cad27dac"
+            ],
+            "steer_count": 0
+          }
+        },
+        "previous_seq": 151
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "153",
+      "data": {
+        "schema_version": 1,
+        "seq": 153,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_fa66cabfd5d847aca92b8494cad27dac",
+        "timestamp": "2026-10-13T21:30:20.007114773+00:00",
+        "created_at": "2026-10-13T21:30:20.007114773+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_fa66cabfd5d847aca92b8494cad27dac",
+            "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+            "kind": "user_message",
+            "status": "completed",
+            "summary": "Говори медленно [slow]",
+            "detail": "Говори медленно [slow]",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:19.955770862Z",
+            "ended_at": "2026-10-13T21:30:19.955770862Z"
+          }
+        },
+        "previous_seq": 152
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "154",
+      "data": {
+        "schema_version": 1,
+        "seq": 154,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_fa66cabfd5d847aca92b8494cad27dac",
+        "timestamp": "2026-10-13T21:30:20.015994411+00:00",
+        "created_at": "2026-10-13T21:30:20.015994411+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_fa66cabfd5d847aca92b8494cad27dac",
+            "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+            "kind": "user_message",
+            "status": "completed",
+            "summary": "Говори медленно [slow]",
+            "detail": "Говори медленно [slow]",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:19.955770862Z",
+            "ended_at": "2026-10-13T21:30:19.955770862Z"
+          }
+        },
+        "previous_seq": 153
+      }
+    },
+    {
+      "event": "turn.lifecycle",
+      "id": "155",
+      "data": {
+        "schema_version": 1,
+        "seq": 155,
+        "event": "turn.lifecycle",
+        "kind": "turn.lifecycle",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:20.030994578+00:00",
+        "created_at": "2026-10-13T21:30:20.030994578+00:00",
+        "payload": {
+          "status": "in_progress"
+        },
+        "previous_seq": 154
+      }
+    },
+    {
+      "event": "turn.workspace_snapshot",
+      "id": "156",
+      "data": {
+        "schema_version": 1,
+        "seq": 156,
+        "event": "turn.workspace_snapshot",
+        "kind": "turn.workspace_snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:20.087081790+00:00",
+        "created_at": "2026-10-13T21:30:20.087081790+00:00",
+        "payload": {
+          "kind": "pre_turn",
+          "snapshot_id": "876e8d40002cf79f12511331025ec2df1684cb82",
+          "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+          "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+        },
+        "previous_seq": 155
+      }
+    },
+    {
+      "event": "model.tools.snapshot",
+      "id": "157",
+      "data": {
+        "schema_version": 1,
+        "seq": 157,
+        "event": "model.tools.snapshot",
+        "kind": "model.tools.snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:20.119077747+00:00",
+        "created_at": "2026-10-13T21:30:20.119077747+00:00",
+        "payload": {
+          "_shortened_by_recorder": true,
+          "payload_keys": [
+            "projection_redacted",
+            "snapshot"
+          ],
+          "tool_names": []
+        },
+        "previous_seq": 156
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "158",
+      "data": {
+        "schema_version": 1,
+        "seq": 158,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_38ae36b171be41ecb2889a6cab201b5d",
+        "timestamp": "2026-10-13T21:30:20.167080878+00:00",
+        "created_at": "2026-10-13T21:30:20.167080878+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_38ae36b171be41ecb2889a6cab201b5d",
+            "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+            "kind": "agent_reasoning",
+            "status": "in_progress",
+            "summary": "",
+            "detail": "",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:20.129150697Z"
+          }
+        },
+        "previous_seq": 157
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "159",
+      "data": {
+        "schema_version": 1,
+        "seq": 159,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_38ae36b171be41ecb2889a6cab201b5d",
+        "timestamp": "2026-10-13T21:30:20.223092984+00:00",
+        "created_at": "2026-10-13T21:30:20.223092984+00:00",
+        "payload": {
+          "delta": "Пользователь ",
+          "kind": "agent_reasoning"
+        },
+        "previous_seq": 158
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "160",
+      "data": {
+        "schema_version": 1,
+        "seq": 160,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_38ae36b171be41ecb2889a6cab201b5d",
+        "timestamp": "2026-10-13T21:30:20.655078342+00:00",
+        "created_at": "2026-10-13T21:30:20.655078342+00:00",
+        "payload": {
+          "delta": "поздоровался, ",
+          "kind": "agent_reasoning"
+        },
+        "previous_seq": 159
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "161",
+      "data": {
+        "schema_version": 1,
+        "seq": 161,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_38ae36b171be41ecb2889a6cab201b5d",
+        "timestamp": "2026-10-13T21:30:21.151088668+00:00",
+        "created_at": "2026-10-13T21:30:21.151088668+00:00",
+        "payload": {
+          "delta": "отвечаю ",
+          "kind": "agent_reasoning"
+        },
+        "previous_seq": 160
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "162",
+      "data": {
+        "schema_version": 1,
+        "seq": 162,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_38ae36b171be41ecb2889a6cab201b5d",
+        "timestamp": "2026-10-13T21:30:21.655094755+00:00",
+        "created_at": "2026-10-13T21:30:21.655094755+00:00",
+        "payload": {
+          "delta": "кратко. ",
+          "kind": "agent_reasoning"
+        },
+        "previous_seq": 161
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "163",
+      "data": {
+        "schema_version": 1,
+        "seq": 163,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_38ae36b171be41ecb2889a6cab201b5d",
+        "timestamp": "2026-10-13T21:30:22.123074339+00:00",
+        "created_at": "2026-10-13T21:30:22.123074339+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_38ae36b171be41ecb2889a6cab201b5d",
+            "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+            "kind": "agent_reasoning",
+            "status": "completed",
+            "summary": "Пользователь поздоровался, отвечаю кратко. ",
+            "detail": "Пользователь поздоровался, отвечаю кратко. ",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:20.129150697Z",
+            "ended_at": "2026-10-13T21:30:22.102754962Z"
+          }
+        },
+        "previous_seq": 162
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "164",
+      "data": {
+        "schema_version": 1,
+        "seq": 164,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_05ba2eaf29a74b22bbb9e1038f1c197b",
+        "timestamp": "2026-10-13T21:30:22.151072698+00:00",
+        "created_at": "2026-10-13T21:30:22.151072698+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_05ba2eaf29a74b22bbb9e1038f1c197b",
+            "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+            "kind": "agent_message",
+            "status": "in_progress",
+            "summary": "",
+            "detail": "",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:22.127385164Z"
+          }
+        },
+        "previous_seq": 163
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "165",
+      "data": {
+        "schema_version": 1,
+        "seq": 165,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_05ba2eaf29a74b22bbb9e1038f1c197b",
+        "timestamp": "2026-10-13T21:30:22.203089218+00:00",
+        "created_at": "2026-10-13T21:30:22.203089218+00:00",
+        "payload": {
+          "delta": "медленно ",
+          "kind": "agent_message"
+        },
+        "previous_seq": 164
+      }
+    },
+    {
+      "event": "turn.interrupt_requested",
+      "id": "166",
+      "data": {
+        "schema_version": 1,
+        "seq": 166,
+        "event": "turn.interrupt_requested",
+        "kind": "turn.interrupt_requested",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:22.529666159+00:00",
+        "created_at": "2026-10-13T21:30:22.529666159+00:00",
+        "payload": {
+          "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+          "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5"
+        },
+        "previous_seq": 165
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "167",
+      "data": {
+        "schema_version": 1,
+        "seq": 167,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_03ce75763b04475f81df5485e4d49658",
+        "timestamp": "2026-10-13T21:30:22.536819223+00:00",
+        "created_at": "2026-10-13T21:30:22.536819223+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_03ce75763b04475f81df5485e4d49658",
+            "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+            "kind": "status",
+            "status": "completed",
+            "summary": "Request cancelled",
+            "detail": "Request cancelled",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:22.526430450Z",
+            "ended_at": "2026-10-13T21:30:22.526434226Z"
+          }
+        },
+        "previous_seq": 166
+      }
+    },
+    {
+      "event": "model.tools.snapshot",
+      "id": "168",
+      "data": {
+        "schema_version": 1,
+        "seq": 168,
+        "event": "model.tools.snapshot",
+        "kind": "model.tools.snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:22.571137174+00:00",
+        "created_at": "2026-10-13T21:30:22.571137174+00:00",
+        "payload": {
+          "_shortened_by_recorder": true,
+          "payload_keys": [
+            "projection_redacted",
+            "snapshot"
+          ],
+          "tool_names": []
+        },
+        "previous_seq": 167
+      }
+    },
+    {
+      "event": "turn.workspace_snapshot",
+      "id": "169",
+      "data": {
+        "schema_version": 1,
+        "seq": 169,
+        "event": "turn.workspace_snapshot",
+        "kind": "turn.workspace_snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:22.603105473+00:00",
+        "created_at": "2026-10-13T21:30:22.603105473+00:00",
+        "payload": {
+          "kind": "post_turn",
+          "snapshot_id": "665dac5c798c977d513954ef5e022220ba656851",
+          "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+          "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+          "changed_paths": []
+        },
+        "previous_seq": 168
+      }
+    },
+    {
+      "event": "item.interrupted",
+      "id": "170",
+      "data": {
+        "schema_version": 1,
+        "seq": 170,
+        "event": "item.interrupted",
+        "kind": "item.interrupted",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": "item_05ba2eaf29a74b22bbb9e1038f1c197b",
+        "timestamp": "2026-10-13T21:30:22.631077330+00:00",
+        "created_at": "2026-10-13T21:30:22.631077330+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_05ba2eaf29a74b22bbb9e1038f1c197b",
+            "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+            "kind": "agent_message",
+            "status": "interrupted",
+            "summary": "медленно ",
+            "detail": "медленно ",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:22.127385164Z",
+            "ended_at": "2026-10-13T21:30:22.604772464Z"
+          }
+        },
+        "previous_seq": 169
+      }
+    },
+    {
+      "event": "turn.completed",
+      "id": "171",
+      "data": {
+        "schema_version": 1,
+        "seq": 171,
+        "event": "turn.completed",
+        "kind": "turn.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:22.691084113+00:00",
+        "created_at": "2026-10-13T21:30:22.691084113+00:00",
+        "payload": {
+          "turn": {
+            "schema_version": 2,
+            "id": "turn_bd690984454e45c18ece169e1e5a05c5",
+            "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+            "status": "interrupted",
+            "input_summary": "Говори медленно [slow]",
+            "created_at": "2026-10-13T21:30:19.955770862Z",
+            "started_at": "2026-10-13T21:30:19.984595115Z",
+            "ended_at": "2026-10-13T21:30:22.635459343Z",
+            "duration_ms": 2650,
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0
+            },
+            "routing_settlement": false,
+            "effective_route_usage": {
+              "input_tokens": 0,
+              "output_tokens": 0
+            },
+            "permission_posture": "ask",
+            "mode": "agent",
+            "effective_provider": "ollama",
+            "effective_provider_id": "ollama",
+            "effective_billing_surface": "local-no-bill",
+            "effective_endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+            "effective_billing_mode": "local",
+            "effective_dispatched_at": "2026-10-13T21:30:20.092262008Z",
+            "effective_model": "qwen3:4b",
+            "modelRequestDiagnostics": {
+              "modelRequestsStarted": 1,
+              "transportRetries": 0,
+              "transparentStreamRetries": 0,
+              "streamResumes": 0,
+              "reasoningOnlyReprompts": 0,
+              "emptyStopRetries": 0
+            },
+            "item_ids": [
+              "item_fa66cabfd5d847aca92b8494cad27dac",
+              "item_38ae36b171be41ecb2889a6cab201b5d",
+              "item_05ba2eaf29a74b22bbb9e1038f1c197b",
+              "item_03ce75763b04475f81df5485e4d49658"
+            ],
+            "steer_count": 0,
+            "workspace": {
+              "state": "pending",
+              "pre_turn_snapshot_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+              "truncated": false,
+              "omitted": 0
+            },
+            "workspace_snapshots": [
+              {
+                "kind": "pre_turn",
+                "snapshot_id": "876e8d40002cf79f12511331025ec2df1684cb82",
+                "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+                "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+              },
+              {
+                "kind": "post_turn",
+                "snapshot_id": "665dac5c798c977d513954ef5e022220ba656851",
+                "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+                "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+                "changed_paths": []
+              }
+            ]
+          }
+        },
+        "previous_seq": 170
+      }
+    },
+    {
+      "event": "turn.artifacts",
+      "id": "172",
+      "data": {
+        "schema_version": 1,
+        "seq": 172,
+        "event": "turn.artifacts",
+        "kind": "turn.artifacts",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:22.727086434+00:00",
+        "created_at": "2026-10-13T21:30:22.727086434+00:00",
+        "payload": {
+          "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+          "workspace": {
+            "state": "settled",
+            "pre_turn_snapshot_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+            "post_turn_snapshot_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+            "truncated": false,
+            "omitted": 0
+          },
+          "artifacts": []
+        },
+        "previous_seq": 171
+      }
+    }
+  ],
+  "event_names": [
+    "stream.progress",
+    "stream.progress",
+    "turn.started",
+    "item.started",
+    "item.completed",
+    "turn.lifecycle",
+    "turn.workspace_snapshot",
+    "model.tools.snapshot",
+    "item.started",
+    "item.delta",
+    "item.delta",
+    "item.delta",
+    "item.delta",
+    "item.completed",
+    "item.started",
+    "item.delta",
+    "turn.interrupt_requested",
+    "item.completed",
+    "model.tools.snapshot",
+    "turn.workspace_snapshot",
+    "item.interrupted",
+    "turn.completed",
+    "turn.artifacts"
+  ],
+  "recorded_at": "2026-10-13T21:30:24+00:00"
+}

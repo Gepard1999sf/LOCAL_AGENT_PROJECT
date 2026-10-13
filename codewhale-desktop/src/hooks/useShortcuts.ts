@@ -28,8 +28,9 @@ export function useShortcuts() {
     (e) => {
       const n = Number(e.key);
       const s = useApp.getState();
-      const target = s.summaries[n - 1];
-      if (target) s.openThread(target.id);
+      // The n-th session as the sidebar lists it, so a search narrows the targets too.
+      const id = s.sidebarOrder ? s.sidebarOrder[n - 1] : s.summaries[n - 1]?.id;
+      if (id) s.openThread(id);
     },
     opts,
   );

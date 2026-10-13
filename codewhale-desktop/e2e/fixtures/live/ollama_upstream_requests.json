@@ -1,0 +1,371 @@
+{
+  "note": "Requests CodeWhale 0.10.2 sent to Ollama's OpenAI-compatible endpoint (captured by mock_ollama.py). System prompt and tool descriptions trimmed; tool parameter schemas reduced to property names.",
+  "endpoint": "POST {OLLAMA_BASE_URL or http://localhost:11434/v1}/chat/completions",
+  "native_api_calls_seen": [],
+  "requests": {
+    "first_turn_request": {
+      "model": "qwen3:4b",
+      "messages": [
+        {
+          "role": "system",
+          "content": "## Codewhale\n\nYou are Codewhale, an agent working alongside the user to carry out their\nrequests — with real tools and a real workspace. You observe, you act, you\nverify.\n\nThe A is already yours. Your competence is a settled fact, not a performance.\nDo the real work — bold, careful, generous. Take the work seriously. Don't take\nyourself seriously. Let the work speak.\n\n### Bearing\nYou answer to the… [trimmed by recorder; 8875 chars total]"
+        },
+        {
+          "role": "user",
+          "content": "Привет! Ответь одним словом.\n<turn_meta>\nCurrent local date: 2026-10-13\nCurrent workspace: /work/demo-project\nCurrent permission posture: Ask\nCurrent sandbox posture: workspace-write (writes inside the workspace; network blocked) (local OS sandbox applied)\n## Repo Working Set\nKey files: README.md\nTop-level dirs: src\nWh… [trimmed by recorder; 526 chars total]"
+        }
+      ],
+      "max_tokens": 2048,
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "bash",
+            "description": "Execute a shell command in the workspace and return stdout and stderr. Output keeps the last 2000 lines or 50KB. An optional timeout is the seconds to wait in the foreground (default 30 seconds); a co… [693 chars]",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "command"
+              ],
+              "properties": [
+                "command",
+                "description",
+                "justification",
+                "read_only",
+                "sandbox_permissions",
+                "timeout"
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "edit",
+            "description": "Edit one file with targeted text replacements. Every edits[].oldText must identify a unique, non-overlapping region of the original file. Merge nearby or overlapping changes into one edit.",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "edits",
+                "path"
+              ],
+              "properties": [
+                "edits",
+                "path"
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read",
+            "description": "Read a file. A text file comes back whole in one call when it fits this call's output budget — 100000 bytes by default, raisable to 500000 with max_bytes. There is no line cap. Use offset and limit fo… [628 chars]",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "path"
+              ],
+              "properties": [
+                "limit",
+                "max_bytes",
+                "offset",
+                "path"
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "description": "Replace the To-do list the user watches. For any task with three or more steps or more than one file, write the list before you start, keep exactly one item in_progress, and mark items done as you fin… [257 chars]",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "todos"
+              ],
+              "properties": [
+                "todos"
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "write",
+            "description": "Write content to a file. Creates the file if it does not exist, overwrites it if it does, and creates parent directories automatically.",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "content",
+                "path"
+              ],
+              "properties": [
+                "content",
+                "path"
+              ]
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto"
+    },
+    "tool_result_followup_request": {
+      "model": "qwen3:4b",
+      "messages": [
+        {
+          "role": "system",
+          "content": "## Codewhale\n\nYou are Codewhale, an agent working alongside the user to carry out their\nrequests — with real tools and a real workspace. You observe, you act, you\nverify.\n\nThe A is already yours. Your competence is a settled fact, not a performance.\nDo the real work — bold, careful, generous. Take the work seriously. Don't take\nyourself seriously. Let the work speak.\n\n### Bearing\nYou answer to the… [trimmed by recorder; 8875 chars total]"
+        },
+        {
+          "role": "user",
+          "content": "Привет! Ответь одним словом.\n<turn_meta>\nCurrent local date: 2026-10-13\nCurrent workspace: /work/demo-project\nCurrent permission posture: Ask\nCurrent sandbox posture: workspace-write (writes inside the workspace; network blocked) (local OS sandbox applied)\n## Repo Working Set\nKey files: README.md\nTop-level dirs: src\nWh… [trimmed by recorder; 526 chars total]"
+        },
+        {
+          "role": "assistant",
+          "content": "Привет! Это ответ тестовой модели (mock Ollama). "
+        },
+        {
+          "role": "user",
+          "content": "Прочитай файл hello.txt [tool:read]\n<turn_meta>\nCurrent local date: 2026-10-13\nCurrent workspace: /work/demo-project\nCurrent permission posture: Ask\nCurrent sandbox posture: workspace-write (writes inside the workspace; network blocked) (local OS sandbox applied)\n## Repo Working Set\nKey files: README.md\nTop-level dirs:… [trimmed by recorder; 549 chars total]"
+        },
+        {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_mock_1",
+              "type": "function",
+              "function": {
+                "name": "read",
+                "arguments": "{\"path\":\"hello.txt\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_mock_1",
+          "content": "hello world"
+        }
+      ],
+      "max_tokens": 2048,
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "bash",
+            "description": "Execute a shell command in the workspace and return stdout and stderr. Output keeps the last 2000 lines or 50KB. An optional timeout is the seconds to wait in the foreground (default 30 seconds); a co… [693 chars]",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "command"
+              ],
+              "properties": [
+                "command",
+                "description",
+                "justification",
+                "read_only",
+                "sandbox_permissions",
+                "timeout"
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "edit",
+            "description": "Edit one file with targeted text replacements. Every edits[].oldText must identify a unique, non-overlapping region of the original file. Merge nearby or overlapping changes into one edit.",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "edits",
+                "path"
+              ],
+              "properties": [
+                "edits",
+                "path"
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read",
+            "description": "Read a file. A text file comes back whole in one call when it fits this call's output budget — 100000 bytes by default, raisable to 500000 with max_bytes. There is no line cap. Use offset and limit fo… [628 chars]",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "path"
+              ],
+              "properties": [
+                "limit",
+                "max_bytes",
+                "offset",
+                "path"
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "todo_write",
+            "description": "Replace the To-do list the user watches. For any task with three or more steps or more than one file, write the list before you start, keep exactly one item in_progress, and mark items done as you fin… [257 chars]",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "todos"
+              ],
+              "properties": [
+                "todos"
+              ]
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "write",
+            "description": "Write content to a file. Creates the file if it does not exist, overwrites it if it does, and creates parent directories automatically.",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "content",
+                "path"
+              ],
+              "properties": [
+                "content",
+                "path"
+              ]
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto"
+    },
+    "manual_compaction_request": {
+      "model": "qwen3:4b",
+      "messages": [
+        {
+          "role": "system",
+          "content": "## Codewhale\n\nYou are Codewhale, an agent working alongside the user to carry out their\nrequests — with real tools and a real workspace. You observe, you act, you\nverify.\n\nThe A is already yours. Your competence is a settled fact, not a performance.\nDo the real work — bold, careful, generous. Take the work seriously. Don't take\nyourself seriously. Let the work speak.\n\n### Bearing\nYou answer to the… [trimmed by recorder; 8875 chars total]"
+        },
+        {
+          "role": "user",
+          "content": "Привет! Ответь одним словом.\n<turn_meta>\nCurrent local date: 2026-10-13\nCurrent workspace: /work/demo-project\nCurrent permission posture: Ask\nCurrent sandbox posture: workspace-write (writes inside the workspace; network blocked) (local OS sandbox applied)\n## Repo Working Set\nKey files: README.md\nTop-level dirs: src\nWh… [trimmed by recorder; 526 chars total]"
+        },
+        {
+          "role": "assistant",
+          "content": "Привет! Это ответ тестовой модели (mock Ollama). "
+        },
+        {
+          "role": "user",
+          "content": "Прочитай файл hello.txt [tool:read]\n<turn_meta>\nCurrent local date: 2026-10-13\nCurrent workspace: /work/demo-project\nCurrent permission posture: Ask\nCurrent sandbox posture: workspace-write (writes inside the workspace; network blocked) (local OS sandbox applied)\n## Repo Working Set\nKey files: README.md\nTop-level dirs:… [trimmed by recorder; 549 chars total]"
+        },
+        {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_mock_1",
+              "type": "function",
+              "function": {
+                "name": "read",
+                "arguments": "{\"path\":\"hello.txt\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_mock_1",
+          "content": "hello world"
+        },
+        {
+          "role": "assistant",
+          "content": "Готово: инструмент выполнен, результат получен. "
+        },
+        {
+          "role": "user",
+          "content": "Создай файл created_by_agent.txt [tool:write]\n<turn_meta_unchanged />"
+        },
+        {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_mock_1",
+              "type": "function",
+              "function": {
+                "name": "write",
+                "arguments": "{\"path\":\"created_by_agent.txt\",\"content\":\"hello from mock\\n\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_mock_1",
+          "content": "Successfully wrote 16 bytes to created_by_agent.txt"
+        },
+        {
+          "role": "assistant",
+          "content": "Готово: инструмент выполнен, результат получен. "
+        },
+        {
+          "role": "user",
+          "content": "Выполни команду [tool:bash]\n<turn_meta>\nCurrent local date: 2026-10-13\nCurrent workspace: /work/demo-project\nCurrent permission posture: Ask\nCurrent sandbox posture: workspace-write (writes inside the workspace; network blocked) (local OS sandbox applied)\n## Repo Working Set\nKey files: README.md\nTop-level dirs: src\nAct… [trimmed by recorder; 607 chars total]"
+        },
+        {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_mock_1",
+              "type": "function",
+              "function": {
+                "name": "bash",
+                "arguments": "{\"command\":\"echo hi-from-bash\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_mock_1",
+          "content": "Error: Tool 'bash' denied by user — the call was not approved. Do not retry the same call; present what you intended and wait for the user's approval or new instructions."
+        },
+        {
+          "role": "assistant",
+          "content": "Готово: инструмент выполнен, результат получен. "
+        },
+        {
+          "role": "user",
+          "content": "Говори медленно [slow]\n<turn_meta>\nCurrent local date: 2026-10-13\nCurrent workspace: /work/demo-project\nCurrent permission posture: Ask\nCurrent sandbox posture: workspace-write (writes inside the workspace; network blocked) (local OS sandbox applied)\n## Repo Working Set\nKey files: README.md\nTop-level dirs: src\nActive p… [trimmed by recorder; 566 chars total]"
+        },
+        {
+          "role": "assistant",
+          "content": "[The following assistant output was interrupted before completion and may be incomplete or wrong]\nмедленно "
+        },
+        {
+          "role": "user",
+          "content": "Write a handoff note so this session's work can continue after its earlier turns are condensed to make room. The reader sees only the note, the most recent messages and live tool state; anything left out is gone.\n\nUse these headings in this order, and write None under any heading with nothing to report:\n## Objective - what the user wants now, in their words where it matters; say if the goal change… [trimmed by recorder; 2242 chars total]"
+        }
+      ],
+      "max_tokens": 2048
+    }
+  }
+}

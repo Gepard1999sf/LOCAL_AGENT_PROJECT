@@ -1,0 +1,229 @@
+{
+  "endpoint": "GET /v1/threads/{id}/events",
+  "phase": "mock",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_0a36e0abf43743d9946e29654d7d448e/events?replay_limit=4096&progress=true&since_seq=172",
+    "auth": true
+  },
+  "status": 200,
+  "response_headers": {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    "x-codewhale-stream-end": "1"
+  },
+  "events": [
+    {
+      "event": "stream.progress",
+      "id": null,
+      "data": {
+        "schema_version": 1,
+        "event": "stream.progress",
+        "kind": "stream.progress",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "seq": 172,
+        "state": "replaying"
+      }
+    },
+    {
+      "event": "stream.progress",
+      "id": null,
+      "data": {
+        "schema_version": 1,
+        "event": "stream.progress",
+        "kind": "stream.progress",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "seq": 172,
+        "state": "live"
+      }
+    },
+    {
+      "event": "turn.started",
+      "id": "174",
+      "data": {
+        "schema_version": 1,
+        "seq": 174,
+        "event": "turn.started",
+        "kind": "turn.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_cd5a0af5ec3d46dba7ffa28055efbef6",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:24.483586589+00:00",
+        "created_at": "2026-10-13T21:30:24.483586589+00:00",
+        "payload": {
+          "turn": {
+            "schema_version": 2,
+            "id": "turn_cd5a0af5ec3d46dba7ffa28055efbef6",
+            "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+            "status": "in_progress",
+            "input_summary": "Manual context compaction",
+            "created_at": "2026-10-13T21:30:24.453729547Z",
+            "started_at": "2026-10-13T21:30:24.453729547Z",
+            "routing_settlement": false,
+            "permission_posture": "ask",
+            "mode": "agent",
+            "effective_provider": "ollama",
+            "effective_provider_id": "ollama",
+            "effective_model": "qwen3:4b",
+            "item_ids": [],
+            "steer_count": 0
+          },
+          "manual_compaction": true
+        },
+        "previous_seq": 172
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "175",
+      "data": {
+        "schema_version": 1,
+        "seq": 175,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_cd5a0af5ec3d46dba7ffa28055efbef6",
+        "item_id": "item_2962f98886d643159638bd3749071c16",
+        "timestamp": "2026-10-13T21:30:24.519082168+00:00",
+        "created_at": "2026-10-13T21:30:24.519082168+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_2962f98886d643159638bd3749071c16",
+            "turn_id": "turn_cd5a0af5ec3d46dba7ffa28055efbef6",
+            "kind": "context_compaction",
+            "status": "in_progress",
+            "summary": "Making room…",
+            "detail": "Making room…",
+            "metadata": {
+              "compaction_id": "compact_be13325578ef49c7a5d838986db5d9fd"
+            },
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:24.494374070Z"
+          },
+          "auto": false
+        },
+        "previous_seq": 174
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "176",
+      "data": {
+        "schema_version": 1,
+        "seq": 176,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_cd5a0af5ec3d46dba7ffa28055efbef6",
+        "item_id": "item_2962f98886d643159638bd3749071c16",
+        "timestamp": "2026-10-13T21:30:24.547789374+00:00",
+        "created_at": "2026-10-13T21:30:24.547789374+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_2962f98886d643159638bd3749071c16",
+            "turn_id": "turn_cd5a0af5ec3d46dba7ffa28055efbef6",
+            "kind": "context_compaction",
+            "status": "completed",
+            "summary": "Made room: 16 → 11 messages (5 removed), ~4216 → ~4347 tokens (summary; last round kept: 6 messages (1 tool results, assistant); verbatim user budget 20000 tokens)",
+            "detail": "Made room: 16 → 11 messages (5 removed), ~4216 → ~4347 tokens (summary; last round kept: 6 messages (1 tool results, assistant); verbatim user budget 20000 tokens)",
+            "metadata": {
+              "compaction_id": "compact_be13325578ef49c7a5d838986db5d9fd"
+            },
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:24.494374070Z",
+            "ended_at": "2026-10-13T21:30:24.531295112Z"
+          },
+          "auto": false,
+          "messages_before": 16,
+          "messages_after": 11
+        },
+        "previous_seq": 175
+      }
+    },
+    {
+      "event": "turn.completed",
+      "id": "177",
+      "data": {
+        "schema_version": 1,
+        "seq": 177,
+        "event": "turn.completed",
+        "kind": "turn.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_cd5a0af5ec3d46dba7ffa28055efbef6",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:24.594543669+00:00",
+        "created_at": "2026-10-13T21:30:24.594543669+00:00",
+        "payload": {
+          "turn": {
+            "schema_version": 2,
+            "id": "turn_cd5a0af5ec3d46dba7ffa28055efbef6",
+            "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+            "status": "completed",
+            "input_summary": "Manual context compaction",
+            "created_at": "2026-10-13T21:30:24.453729547Z",
+            "started_at": "2026-10-13T21:30:24.453729547Z",
+            "ended_at": "2026-10-13T21:30:24.555457465Z",
+            "duration_ms": 101,
+            "usage": {
+              "input_tokens": 1200,
+              "output_tokens": 42
+            },
+            "routing_settlement": false,
+            "effective_route_usage": {
+              "input_tokens": 0,
+              "output_tokens": 0
+            },
+            "permission_posture": "ask",
+            "mode": "agent",
+            "effective_provider": "ollama",
+            "effective_provider_id": "ollama",
+            "effective_model": "qwen3:4b",
+            "routed_usage": [
+              {
+                "route": {
+                  "provider": "ollama",
+                  "provider_identity": "ollama",
+                  "model": "qwen3:4b",
+                  "billing_surface": "local-no-bill",
+                  "endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+                  "provider_live_pricing": null,
+                  "billing_mode": "local",
+                  "dispatched_at": "2026-10-13T21:30:24.484278764Z"
+                },
+                "usage": {
+                  "input_tokens": 1200,
+                  "output_tokens": 42
+                }
+              }
+            ],
+            "routed_usage_source_ids": [
+              "2296324745a186dfdb48301e02f41e5f6e9abf76a19233b1d443e055d712733d"
+            ],
+            "item_ids": [
+              "item_2962f98886d643159638bd3749071c16"
+            ],
+            "steer_count": 0,
+            "workspace": {
+              "state": "unavailable",
+              "reason": "not_captured",
+              "truncated": false,
+              "omitted": 0
+            }
+          }
+        },
+        "previous_seq": 176
+      }
+    }
+  ],
+  "event_names": [
+    "stream.progress",
+    "stream.progress",
+    "turn.started",
+    "item.started",
+    "item.completed",
+    "turn.completed"
+  ],
+  "recorded_at": "2026-10-13T21:30:26+00:00"
+}

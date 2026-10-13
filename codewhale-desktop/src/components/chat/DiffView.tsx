@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from "react";
 
-interface DiffLine {
+export interface DiffLine {
   type: "add" | "del" | "ctx" | "hunk" | "file";
   text: string;
   oldNo?: number;
@@ -9,48 +9,92 @@ interface DiffLine {
 
 export function parseUnifiedDiff(text: string): DiffLine[] {
   const out: DiffLine[] = [];
-  let oldNo = 0;
-  let newNo = 0;
-  for (const raw of text.replace(/\r\n/g, "\n").split("\n")) {
+  const src = text.replace(/\r\n/g, "\n").split("\n");
+  if (src.at(-1) === "") src.pop();
+  // Line numbers are known only after a parsable @@ header.
+  let oldNo: number | undefined;
+  let newNo: number | undefined;
+  // Lines the current hunk still holds, from its @@ counts. "--- "/"+++ " are file
+  // headers only outside a hunk: inside one, "--- x" is the deleted line "-- x".
+  let inHunk = false;
+  let oldLeft = 0;
+  let newLeft = 0;
+  // Between "diff --git" and the first @@ (mode, rename, "Binary files differ" lines).
+  let gitHeader = false;
+  for (let i = 0; i < src.length; i++) {
+    const raw = src[i];
     if (raw.startsWith("@@")) {
-      const m = /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
-      if (m) {
-        oldNo = Number(m[1]);
-        newNo = Number(m[2]);
-      }
+      const m = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(raw);
+      oldNo = m ? Number(m[1]) : undefined;
+      newNo = m ? Number(m[3]) : undefined;
+      // An omitted count means 1; without counts the hunk runs until the next file.
+      oldLeft = m ? Number(m[2] ?? 1) : Infinity;
+      newLeft = m ? Number(m[4] ?? 1) : Infinity;
+      inHunk = true;
+      gitHeader = false;
       out.push({ type: "hunk", text: raw });
-    } else if (raw.startsWith("+++") || raw.startsWith("---") || raw.startsWith("diff ") || raw.startsWith("index ")) {
+      continue;
+    }
+    const headerPos = !inHunk || (oldLeft <= 0 && newLeft <= 0);
+    // A "--- / +++ / @@" triple starts the next file even after a hunk with wrong counts.
+    const nextFile = raw.startsWith("--- ") && src[i + 1]?.startsWith("+++ ") && src[i + 2]?.startsWith("@@");
+    if (raw.startsWith("diff ")) gitHeader = true;
+    if (
+      gitHeader ||
+      nextFile ||
+      (headerPos && (raw.startsWith("--- ") || raw.startsWith("+++ ") || raw.startsWith("index ")))
+    ) {
+      inHunk = false;
+      out.push({ type: "file", text: raw });
+    } else if (raw.startsWith("\\")) {
+      // "\ No newline at end of file"
       out.push({ type: "file", text: raw });
     } else if (raw.startsWith("+")) {
-      out.push({ type: "add", text: raw.slice(1), newNo: newNo++ });
+      out.push({ type: "add", text: raw.slice(1), newNo: newNo === undefined ? undefined : newNo++ });
+      newLeft--;
     } else if (raw.startsWith("-")) {
-      out.push({ type: "del", text: raw.slice(1), oldNo: oldNo++ });
+      out.push({ type: "del", text: raw.slice(1), oldNo: oldNo === undefined ? undefined : oldNo++ });
+      oldLeft--;
     } else {
-      out.push({ type: "ctx", text: raw.startsWith(" ") ? raw.slice(1) : raw, oldNo: oldNo++, newNo: newNo++ });
+      out.push({
+        type: "ctx",
+        text: raw.startsWith(" ") ? raw.slice(1) : raw,
+        oldNo: oldNo === undefined ? undefined : oldNo++,
+        newNo: newNo === undefined ? undefined : newNo++,
+      });
+      oldLeft--;
+      newLeft--;
     }
   }
   return out;
 }
 
-export function diffStats(text: string): { add: number; del: number } {
+function countStats(lines: DiffLine[]): { add: number; del: number } {
   let add = 0;
   let del = 0;
-  for (const l of text.split("\n")) {
-    if (l.startsWith("+") && !l.startsWith("+++")) add++;
-    else if (l.startsWith("-") && !l.startsWith("---")) del++;
+  for (const l of lines) {
+    if (l.type === "add") add++;
+    else if (l.type === "del") del++;
   }
   return { add, del };
+}
+
+export function diffStats(text: string): { add: number; del: number } {
+  return countStats(parseUnifiedDiff(text));
 }
 
 export function looksLikeDiff(text: string): boolean {
   return /^@@ -\d+/m.test(text) || (/^--- /m.test(text) && /^\+\+\+ /m.test(text));
 }
 
-/** Unified or side-by-side diff renderer (replaces react-diff-viewer, which is unmaintained). */
-export const DiffView = memo(function DiffView({ text, maxHeight = 480 }: { text: string; maxHeight?: number }) {
-  const lines = useMemo(() => parseUnifiedDiff(text), [text]);
+/**
+ * Unified or side-by-side diff renderer (replaces react-diff-viewer, which is unmaintained).
+ * Takes unified diff `text`, or ready `lines` when there is no real diff to parse.
+ */
+export const DiffView = memo(function DiffView({ text, lines: given, maxHeight = 480 }: { text?: string; lines?: DiffLine[]; maxHeight?: number }) {
+  const lines = useMemo(() => given ?? parseUnifiedDiff(text ?? ""), [given, text]);
   const [split, setSplit] = useState(false);
-  const stats = useMemo(() => diffStats(text), [text]);
+  const stats = useMemo(() => countStats(lines), [lines]);
 
   const rows = useMemo(() => {
     if (!split) return null;

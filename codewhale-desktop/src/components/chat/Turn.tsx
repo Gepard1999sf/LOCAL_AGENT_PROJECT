@@ -4,6 +4,7 @@ import { useThreads, type TurnView } from "../../store/threads";
 import { useApp } from "../../store/app";
 import { Markdown } from "./Markdown";
 import { ApprovalCard, CompactionBlock, ErrorBlock, StatusLine, ThinkingBlock, ToolBlock } from "./Blocks";
+import { UserInputCard } from "./UserInputCard";
 import { fmtDuration, fmtTimeSec, fmtTokens } from "../../lib/format";
 import { IconButton } from "../ui/primitives";
 
@@ -13,10 +14,13 @@ const Block = memo(function Block({ threadId, blockId, isLastInTurn, turnActive 
   const showThinking = useApp((s) => s.settings?.showThinking ?? true);
   const showTools = useApp((s) => s.settings?.showToolCalls ?? true);
   const isApproval = blockId.startsWith("approval:");
+  const isInput = blockId.startsWith("input:");
   const approval = useThreads((s) => (isApproval ? s.threads[threadId]?.approvals[blockId.slice(9)] : undefined));
-  const item = useThreads((s) => (isApproval ? undefined : s.threads[threadId]?.items[blockId]));
+  const input = useThreads((s) => (isInput ? s.threads[threadId]?.userInputs[blockId.slice(6)] : undefined));
+  const item = useThreads((s) => (isApproval || isInput ? undefined : s.threads[threadId]?.items[blockId]));
 
   if (isApproval) return approval ? <ApprovalCard threadId={threadId} approval={approval} /> : null;
+  if (isInput) return input ? <UserInputCard threadId={threadId} request={input} /> : null;
   if (!item) return null;
   switch (item.kind) {
     case "agent_message": {

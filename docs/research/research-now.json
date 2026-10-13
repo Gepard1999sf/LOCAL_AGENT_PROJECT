@@ -1,0 +1,514 @@
+{
+ "ollama-tuning": [
+  {
+   "name": "VRAM fit estimator: weights plus a KV cache formula that understands hybrid, SWA and GQA layouts",
+   "what": "A per-GPU recommender that adds three terms: weight bytes (params x bits-per-weight / 8), KV bytes (2 x attention layers that grow a cache x KV heads x head_dim x bytes per element x context x parallel), and fixed overhead. The architecture numbers come from the GGUF metadata that Ollama already returns from /api/show, and the result is checked against /api/ps after loading.",
+   "date": "Formula is standard; GGUF keys checked against llama.cpp master and Ollama docs on 2026-10-13",
+   "concrete_claims": "KV formula: 2 x layers x KV heads x head_dim x seq_len x bytes per element, times batch size. Sliding-window and hybrid architectures count only the layers that actually grow a cache, and MLA uses a compressed latent instead (https://sebastianraschka.com/llm-architecture-gallery/kv-cache-calculations, https://www.morphllm.com/kv-cache-explained). Bits per weight measured by llama.cpp: Q4_K_M 4.8944, Q5_K_M 5.7036, Q6_K 6.5633, Q8_0 8.5008, IQ4_XS 4.4597, Q3_K_M 3.9960 (https://raw.githubusercontent.com/ggml-org/llama.cpp/master/tools/quantize/README.md). GGUF metadata keys: `%s.attention.head_count_kv`, `%s.attention.key_length`, `%s.attention.value_length`, `%s.attention.sliding_window`, `%s.attention.sliding_window_pattern`, `%s.full_attention_interval` (qwen35/qwen3next), `%s.ssm.*` (https://raw.githubusercontent.com/ggml-org/llama.cpp/master/src/llama-arch.cpp). /api/show returns `model_info` with `<arch>.block_count`, `<arch>.attention.head_count_kv`, `<arch>.context_length`, and `capabilities` (https://raw.githubusercontent.com/ollama/ollama/main/docs/api.md). /api/ps returns `size`, `size_vram` and `context_length` (https://raw.githubusercontent.com/ollama/ollama/main/api/types.go). Ollama KV types: q8_0 uses about half the memory of f16 and q4_0 about a quarter (https://raw.githubusercontent.com/ollama/ollama/main/docs/faq.mdx). Required RAM scales with OLLAMA_NUM_PARALLEL x OLLAMA_CONTEXT_LENGTH (same FAQ). llama.cpp's `llama-fit-params` / `--fit` estimates projected device memory, defaults to a 1024 MiB margin, and prints fitted `-c`, `-ngl` and `-ot` arguments (https://raw.githubusercontent.com/ggml-org/llama.cpp/master/tools/fit-params/README.md). Worked f16 KV per token, computed from the published configs: Qwen3.6/3.8-27B = 2x16x4x256x2 B = 64 KiB (16 GiB at 262,144 tokens; about 4.5 GiB with q4_0); Qwen3.6-35B-A3B = 2x10x2x256x2 B = 20 KiB, with 40 layers, 10 of them full attention and 2 KV heads (https://huggingface.co/Qwen/Qwen3.6-35B-A3B); Qwen3-Coder-30B-A3B = 2x48x4x128x2 B = 96 KiB; gpt-oss-20b = 12 full-attention layers x 8 KV heads x head_dim 64, about 24 KiB, with the other 12 layers on a 128-token sliding window (https://huggingface.co/openai/gpt-oss-20b/blob/main/config.json); Devstral Small 2 = 40 layers x 8 KV heads x 128, so 160 KiB per token (https://huggingface.co/mistralai/Devstral-Small-2-24B-Instruct-2512/blob/main/config.json). Cross-check: the measured 22 GB for Qwen3.6-27B Q4_K_M at 256K with q4 KV (https://github.com/outsourc-e/qwen36-4090-recipes) is consistent with about 16.7 GB of weights plus about 4.5 GiB of KV.",
+   "sources": [
+    "https://raw.githubusercontent.com/ggml-org/llama.cpp/master/tools/quantize/README.md",
+    "https://raw.githubusercontent.com/ggml-org/llama.cpp/master/src/llama-arch.cpp",
+    "https://raw.githubusercontent.com/ggml-org/llama.cpp/master/tools/fit-params/README.md",
+    "https://raw.githubusercontent.com/ollama/ollama/main/docs/api.md",
+    "https://raw.githubusercontent.com/ollama/ollama/main/api/types.go",
+    "https://raw.githubusercontent.com/ollama/ollama/main/docs/faq.mdx",
+    "https://sebastianraschka.com/llm-architecture-gallery/kv-cache-calculations",
+    "https://huggingface.co/Qwen/Qwen3.6-35B-A3B",
+    "https://huggingface.co/openai/gpt-oss-20b/blob/main/config.json",
+    "https://huggingface.co/mistralai/Devstral-Small-2-24B-Instruct-2512/blob/main/config.json"
+   ],
+   "how_we_use_it": "Add a Rust function, for example `estimate_fit(model_info, quant, ctx, kv_type, parallel)`, in src-tauri/src/ollama.rs. It reads `general.parameter_count`, `<arch>.block_count`, `head_count_kv` (scalar or per-layer array), `key_length`/`value_length`, `sliding_window`/`sliding_window_pattern`, `full_attention_interval` and `ssm.*` from the /api/show response the app already fetches. Combine that with `memTotalMb` from gpu_stats() (system.rs), keeping about 1 GiB of margin plus Windows/DWM usage. The UI shows a fit badge for each installed model and each catalog model (Fits at 64K / Fits at 128K with q8 KV / Spills to CPU) and offers a context slider that feeds ollama_create_variant. After loading, compare /api/ps `size_vram` with `size` to detect CPU spill and show a StatusBar warning. Optional power-user mode: locate the GGUF blob from the `FROM` line in /api/show `modelfile` and run a bundled `llama-fit-params` for an exact projection.",
+   "impact": "high",
+   "effort": "M",
+   "maturity": "production"
+  },
+  {
+   "name": "Ollama context and KV-cache configuration: avoid the silent 4K-context trap",
+   "what": "Ollama now picks its default context from VRAM size, and that default is 4K on any GPU under 24 GiB. CodeWhale talks to Ollama through the OpenAI-compatible /v1 endpoint, which cannot set num_ctx, so an untouched 8-16 GB setup runs agentic coding with a 4K window and silently truncates the prompt.",
+   "date": "Ollama docs (main) read 2026-10-13; Ollama v0.34.4 = 2026-09-23",
+   "concrete_claims": "Ollama's context-length doc: '< 24 GiB VRAM: 4k context; 24-48 GiB: 32k; >= 48 GiB: 256k'. Tasks such as 'agents, and coding tools should be set to at least 64000 tokens'. The doc gives `OLLAMA_CONTEXT_LENGTH=64000 ollama serve`, and `ollama ps` shows a CONTEXT column (https://raw.githubusercontent.com/ollama/ollama/main/docs/context-length.mdx). OpenAI-compat doc: 'The OpenAI API does not have a way of setting the context size'; it says to create a model with `PARAMETER num_ctx` (https://raw.githubusercontent.com/ollama/ollama/main/docs/api/openai-compatibility.mdx). /api/create accepts `from` plus a `parameters` dictionary (https://raw.githubusercontent.com/ollama/ollama/main/docs/api.md). KV quantization: `OLLAMA_KV_CACHE_TYPE` defaults to f16; q8_0 is 'recommended if not using f16' and requires Flash Attention, which Ollama enables automatically when supported (`OLLAMA_FLASH_ATTENTION`). `OLLAMA_NUM_PARALLEL` defaults to 1 and memory scales with NUM_PARALLEL x CONTEXT_LENGTH (https://raw.githubusercontent.com/ollama/ollama/main/docs/faq.mdx). The OpenAI layer supports `reasoning_effort`; for models with named levels, unsupported names resolve to the model's default (openai-compatibility.mdx). Third-party reports confirm the 4K default for Gemma 4 (https://www.verdent.ai/guides/gemma-4-ollama).",
+   "sources": [
+    "https://raw.githubusercontent.com/ollama/ollama/main/docs/context-length.mdx",
+    "https://raw.githubusercontent.com/ollama/ollama/main/docs/api/openai-compatibility.mdx",
+    "https://raw.githubusercontent.com/ollama/ollama/main/docs/faq.mdx",
+    "https://raw.githubusercontent.com/ollama/ollama/main/docs/api.md",
+    "https://docs.ollama.com/faq"
+   ],
+   "how_we_use_it": "The app already has ollama_create_variant (which bakes num_ctx, range 2048..262144) and reads `num_ctx` from /api/show parameters (ollama.rs). Turn this into a guarded flow. (1) Before starting the CodeWhale sidecar, if the selected model has no baked num_ctx and VRAM is under 24 GiB, block with a one-click 'Create 64K variant' or the estimator's best context. (2) If the desktop app manages the Ollama service, set OLLAMA_KV_CACHE_TYPE=q8_0, OLLAMA_NUM_PARALLEL=1 and OLLAMA_FLASH_ATTENTION=1 at launch, and show them in the Inspector. (3) Poll /api/ps `context_length` and show the effective context in StatusBar.tsx next to the model name, in red when it is below 32K. (4) Map CodeWhale's reasoning tier to model-supported reasoning_effort names, read from /api/show, so 'max' does not quietly turn into the slowest setting on a local GPU.",
+   "impact": "high",
+   "effort": "S",
+   "maturity": "production"
+  },
+  {
+   "name": "Context-window autosizing: Ollama's 4k VRAM-tier default, num_ctx variants and syncing CodeWhale's context_window",
+   "what": "Ollama now picks a default context from total VRAM: 4k below 24 GiB, 32k for 24–48 GiB, 256k at 48 GiB and up. Its own docs say agents and coding tools need at least 64000 tokens. On a typical 8–16 GB consumer card the default is 4096, so a coding agent silently loses the start of its prompt. The OpenAI-compatible endpoint that CodeWhale uses cannot carry num_ctx.",
+   "date": "Docs and code as of Ollama main 2026-10-13; latest stable v0.40.3 (2026-10-11)",
+   "concrete_claims": "VRAM tiers: '< 24 GiB VRAM: 4k context; 24-48 GiB: 32k; >= 48 GiB: 256k'. Docs also say 'Tasks which require large context like web search, agents, and coding tools should be set to at least 64000 tokens' (https://github.com/ollama/ollama/blob/main/docs/context-length.mdx = https://docs.ollama.com/context-length). Code compares against 47/23 GiB thresholds after subtracting OLLAMA_GPU_OVERHEAD, setting defaultNumCtx to 262144/32768/4096 (https://github.com/ollama/ollama/blob/main/server/routes.go). Automatic ctx is used only when neither the request, the Modelfile num_ctx nor OLLAMA_CONTEXT_LENGTH is set (usesAutomaticNumCtx, same file). When the automatic ctx does not fit, the scheduler steps down 262144→32768→4096 (nextLowerAutoNumCtx in https://github.com/ollama/ollama/blob/main/server/sched.go). OpenAI ChatCompletionRequest has no num_ctx field; it does have the Ollama extension keep_alive and reasoning_effort (https://github.com/ollama/ollama/blob/main/openai/openai.go). /api/ps returns context_length per loaded model (https://github.com/ollama/ollama/blob/main/api/types.go). Since v0.30.9 Ollama returns an error if a single message is larger than the current context window (https://github.com/ollama/ollama/releases?page=4). The CodeWhale provider table accepts context_window, and auto-compaction defaults to 80% of the window (auto_compact_threshold_percent) (local cw-src/config.example.toml lines 619, 1357-1361).",
+   "sources": [
+    "https://github.com/ollama/ollama/blob/main/docs/context-length.mdx",
+    "https://github.com/ollama/ollama/blob/main/server/routes.go",
+    "https://github.com/ollama/ollama/blob/main/server/sched.go",
+    "https://github.com/ollama/ollama/blob/main/openai/openai.go",
+    "https://github.com/ollama/ollama/blob/main/api/types.go",
+    "https://github.com/ollama/ollama/releases?page=4"
+   ],
+   "how_we_use_it": "Turn the existing ollama_create_variant (src-tauri/src/ollama.rs) into a 'Context wizard'. (1) Read GGUF metadata from /api/show (block_count, head_count_kv, key/value_length, context_length) and free VRAM from nvidia-smi, which StatusBar already polls. (2) Compute the largest num_ctx that keeps the model 100% on GPU for the chosen KV type, offering 32k/64k/128k presets with a 'fits fully / will spill' badge. (3) Create '<model>-cw<ctx>k' with parameters {num_ctx}. (4) Write context_window = num_ctx into ~/.codewhale/config.toml [providers.ollama], or into the custom provider table, so CodeWhale compacts at 80% of the real window instead of overflowing. (5) After first load, verify /api/ps context_length and size_vram == size; the Inspector ContextTab mismatch warning already exists, so add a 'Fix' button there. Also offer server-wide OLLAMA_CONTEXT_LENGTH as an alternative when a managed server is used (see the managed-server item).",
+   "impact": "high",
+   "effort": "M",
+   "maturity": "production"
+  },
+  {
+   "name": "Context-window autopilot for Ollama: auto-fit and pin num_ctx, detect silent truncation",
+   "what": "Ollama picks a default context window based on VRAM, and it is 4k below 24 GiB. Its OpenAI-compatible /v1 endpoint (the one CodeWhale uses) cannot set num_ctx. Overflow has historically been dropped silently. Auto-fitting the largest num_ctx that keeps the model 100% on GPU, and pinning it per model, is the most important reliability fix for a local agent.",
+   "concrete_claims": "- Ollama docs give these defaults: '< 24 GiB VRAM: 4k context, 24-48 GiB: 32k, >= 48 GiB: 256k'. They also say agents and coding tools 'should be set to at least 64000 tokens', and to check the CPU/GPU split and CONTEXT with `ollama ps` (https://docs.ollama.com/context-length, source https://github.com/ollama/ollama/blob/main/docs/context-length.mdx). The tiers shipped in 0.15.5 (https://github.com/ollama/ollama/issues/14073). That issue also reports the 256k default spilling to CPU on a 52 GB machine.\n- The OpenAI-compat doc says: 'The OpenAI API does not have a way of setting the context size for a model'. The fix it gives is a Modelfile with `PARAMETER num_ctx` plus `ollama create` (https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx).\n- Aider quantization study (2024-11-21) on Qwen2.5-Coder-32B fp16 in Ollama: 71.4% pass with 90.2% well-formed edits at >=8k ctx, versus 51.9% pass with 46.2% well-formed at Ollama's then-default 2k. It says Ollama 'silently truncates the request by discarding the oldest messages' (https://aider.chat/2024/11/21/quantization.html, data https://github.com/Aider-AI/aider/blob/main/aider/website/_data/quant.yml).\n- Changing num_ctx between requests forces a full model reload, because the KV cache is allocated at load time. One secondary report measured about 140 s per reload for a 17 GB model (https://dev.to/pat9000/pin-your-context-window-or-pay-the-reload-tax-3nfo).\n- /api/ps returns `context_length` and `size_vram` (https://github.com/ollama/ollama/blob/main/api/types.go). llm/server.go clamps num_ctx to the training context and warns 'requested context size too large for model' (https://github.com/ollama/ollama/blob/main/llm/server.go).\n- Ollama FAQ on memory: OLLAMA_KV_CACHE_TYPE defaults to f16. q8_0 uses about 1/2 the memory with 'very small loss in precision', and q4_0 about 1/4. Flash attention turns on automatically when supported (https://github.com/ollama/ollama/blob/main/docs/faq.mdx). The llama.cpp docs warn that 'extreme KV quantizations (e.g. -ctk q4_0) ... can substantially degrade the model's tool calling performance' (https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md).",
+   "sources": [
+    "https://docs.ollama.com/context-length",
+    "https://github.com/ollama/ollama/blob/main/docs/context-length.mdx",
+    "https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx",
+    "https://aider.chat/2024/11/21/quantization.html",
+    "https://github.com/Aider-AI/aider/blob/main/aider/website/_data/quant.yml",
+    "https://aider.chat/docs/llms/ollama.html",
+    "https://github.com/ollama/ollama/issues/14073",
+    "https://github.com/ollama/ollama/blob/main/api/types.go",
+    "https://github.com/ollama/ollama/blob/main/docs/faq.mdx",
+    "https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md",
+    "https://dev.to/pat9000/pin-your-context-window-or-pay-the-reload-tax-3nfo"
+   ],
+   "how_we_use_it": "Build on what Desktop already has: `ollama_create_variant` and `ollama_models` (num_ctx/native_ctx) in src-tauri/src/ollama.rs, and `gpu_stats` via nvidia-smi in src-tauri/src/system.rs.\n(1) Add a 'Fit context' step that runs automatically on model select. Read /api/show model_info (block_count, head_count_kv, key/value length) and compute KV bytes per token for f16 vs q8_0. Subtract the weight size plus about 1 GB of headroom from free VRAM. Pick the largest num_ctx that fits, capped at native_ctx.\n(2) Create a `<model>-cw<N>k` variant with POST /api/create {from, parameters:{num_ctx}}. Warm-load it, then check /api/ps: size_vram==size (100% GPU) and context_length==requested. If either fails, step down.\n(3) Write the real window into CodeWhale's route config. Then crates/runtime/src/context_budget.rs computes its ~75% compaction trigger from the true window, not the model's advertised 128k.\n(4) Add a truncation guard. Compare Ollama's reported prompt tokens (usage.prompt_tokens / prompt_eval_count) with CodeWhale's own estimate. If the reported count is clearly lower, or pinned at num_ctx, show a red 'history was cut' banner and force compaction.\n(5) Add an Ollama settings page that recommends OLLAMA_FLASH_ATTENTION=1 and OLLAMA_KV_CACHE_TYPE=q8_0, never q4_0 for agent work, and states that num_ctx is never varied per request.",
+   "impact": "high",
+   "effort": "S",
+   "maturity": "production",
+   "date": "Ollama context-length docs current as of Oct 2026 (VRAM tiers since v0.15.5); Aider study 2024-11-21"
+  },
+  {
+   "name": "Context-overflow and CPU-offload guard (silent Ollama truncation detection)",
+   "what": "Agent loops with local models often fail for two silent reasons. (1) Ollama truncates chat history by default when the prompt exceeds the loaded num_ctx, so the model forgets earlier tool results and starts repeating itself. (2) The model is partly offloaded to CPU, which cuts speed several-fold. Ollama's /api/ps exposes size, size_vram and context_length, so both can be detected cheaply.",
+   "concrete_claims": "/api/ps returns per model: name, model, size, digest, details, expires_at, size_vram ('VRAM usage in bytes') and context_length ('Context length for the running model') (https://github.com/ollama/ollama/blob/main/api/types.go ProcessModelResponse; https://github.com/ollama/ollama/blob/main/docs/openapi.yaml). The FAQ shows the PROCESSOR column as '100% GPU', '100% CPU' or '48%/52% CPU/GPU' (https://github.com/ollama/ollama/blob/main/docs/faq.mdx). ChatRequest has `truncate` ('truncates the chat history messages if the rendered prompt exceeds the context length limit') and `shift` (api/types.go). The server defaults both to true when they are unset: `req.Truncate == nil || *req.Truncate` and `Shift: req.Shift == nil || *req.Shift` (https://github.com/ollama/ollama/blob/main/server/routes.go). The OpenAI-compatible request type has no truncate or shift fields at all (openai/openai.go), so /v1 clients like CodeWhale always get the defaults. chatPrompt 'truncates any messages that exceed the context window… always include 1) the latest message and 2) system messages' and logs this only at slog.Debug 'truncating input messages which exceed context length' (https://github.com/ollama/ollama/blob/main/server/prompt.go). Preload: an empty request to /api/chat or /api/generate loads the model, and keep_alive / OLLAMA_KEEP_ALIVE control residency, with a default of 5 minutes (faq.mdx). OLLAMA_LOAD_TIMEOUT is 'How long to allow model loads to stall before giving up (default \"5m\")' (https://github.com/ollama/ollama/blob/main/envconfig/config.go). Windows logs are under %LOCALAPPDATA%\\Ollama\\server.log, and OLLAMA_DEBUG=1 turns on verbose logging (https://github.com/ollama/ollama/blob/main/docs/troubleshooting.mdx).",
+   "sources": [
+    "https://github.com/ollama/ollama/blob/main/api/types.go",
+    "https://github.com/ollama/ollama/blob/main/server/routes.go",
+    "https://github.com/ollama/ollama/blob/main/server/prompt.go",
+    "https://github.com/ollama/ollama/blob/main/docs/faq.mdx",
+    "https://github.com/ollama/ollama/blob/main/docs/openapi.yaml",
+    "https://github.com/ollama/ollama/blob/main/envconfig/config.go",
+    "https://github.com/ollama/ollama/blob/main/docs/troubleshooting.mdx"
+   ],
+   "how_we_use_it": "src-tauri/src/ollama.rs ollama_status already fetches /api/ps. Have it return offloadPct = 1 − size_vram/size and contextLength for each loaded model. In the UI: (1) Show an amber 'CPU offload 37%' chip in StatusBar whenever size_vram < size, with a one-click 'try smaller num_ctx' action that reuses the existing ollama_create_variant. (2) On every turn.usage, compare usage.input_tokens with /api/ps context_length. Above about 95%, show a red banner: 'Ollama dropped old messages from the prompt; the model can no longer see earlier tool output'. Also compare CodeWhale's own ContextUsage.window_tokens (src/lib/types.ts) with context_length. If CodeWhale assumes a bigger window than Ollama actually loaded, CodeWhale's compaction never fires and Ollama truncates silently. Offer to fix either side: bake num_ctx with a variant, or lower the CodeWhale window. (3) Prewarm the selected model with an empty /api/chat request and keep_alive when a thread opens, then show load time measured by wall clock. (4) Add a 'Diagnostics' button that opens %LOCALAPPDATA%\\Ollama\\server.log filtered for 'truncating input messages' (visible only with OLLAMA_DEBUG=1) and for layer-offload lines.",
+   "impact": "high",
+   "effort": "S",
+   "maturity": "production",
+   "date": "Ollama main as of 2026-10-13 (v0.40.3)"
+  },
+  {
+   "name": "KV-cache quantization (q8_0 / q4_0) with llama.cpp's Hadamard attention rotation and auto flash attention",
+   "what": "Quantizing the K/V cache halves (q8_0) or quarters (q4_0) context memory. Since April 2026, llama.cpp rotates Q/K/V with a Hadamard transform before caching, which makes q8_0 almost lossless and q4_0 usable. Ollama on NVIDIA now runs llama.cpp's llama-server and passes OLLAMA_KV_CACHE_TYPE to both caches. Flash attention is automatic.",
+   "date": "Rotation PR #21038 merged 2026-04-01; Ollama FAQ current as of 2026-10",
+   "concrete_claims": "OLLAMA_KV_CACHE_TYPE: f16 (default), q8_0 (~1/2 memory, 'recommended if not using f16'), q4_0 (~1/4 memory). It is a global option. Flash attention is used automatically when supported, and OLLAMA_FLASH_ATTENTION=1/0 forces it on or off (https://github.com/ollama/ollama/blob/main/docs/faq.mdx). Ollama passes '--cache-type-k X --cache-type-v X' and '--flash-attn auto' to llama-server (https://github.com/ollama/ollama/blob/main/llm/llama_server.go). PR #21038 'rotate activations for better quantization' was merged 2026-04-01. Qwen3.5-9B mean KLD: f16/f16 0.000782, q8_0/q8_0 0.000799, q4_0/q4_0 0.004782. gpt-oss-20b AIME25: Q4_0 KV 2.0%→21.7% and Q8_0 31.7%→37.1% vs F16 37.9%. Token generation is about 0.88–0.93x on Qwen3-30B-A3B Q4_0 CUDA (https://github.com/ggml-org/llama.cpp/pull/21038). Opt-out env LLAMA_ATTN_ROT_DISABLE (https://github.com/ggml-org/llama.cpp/blob/master/src/llama-kv-cache.cpp). Allowed llama-server cache types: f32, f16, bf16, q8_0, q4_0, q4_1, iq4_nl, q5_0, q5_1 (https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md). v0.31.2 enabled flash attention on NVIDIA compute capability 6.x (https://github.com/ollama/ollama/releases?page=4). Caveat: issue #25382 (2026-07-07) reported garbage output on DeepSeek-V4 with a q8_0 K-cache because of rotation; the workaround is an f16 K-cache. It was closed the same day (https://github.com/ggml-org/llama.cpp/issues/25382).",
+   "sources": [
+    "https://github.com/ollama/ollama/blob/main/docs/faq.mdx",
+    "https://github.com/ggml-org/llama.cpp/pull/21038",
+    "https://github.com/ggml-org/llama.cpp/blob/master/src/llama-kv-cache.cpp",
+    "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md",
+    "https://github.com/ollama/ollama/blob/main/llm/llama_server.go",
+    "https://github.com/ggml-org/llama.cpp/issues/25382",
+    "https://github.com/ollama/ollama/releases?page=4"
+   ],
+   "how_we_use_it": "Add a 'KV cache' segmented control in SettingsPanel → Ollama: f16 / q8_0 (default recommendation) / q4_0 ('max context'). Changing it rewrites the managed-server environment and restarts Ollama; this is required because the setting is server-global. The Context wizard then recomputes the maximum num_ctx (about 2x more tokens at q8_0). Leave OLLAMA_FLASH_ATTENTION unset (auto). Show a per-model warning to fall back to f16 for DeepSeek-family models if output degrades, since the user previously ran deepseek locally. For the llama.cpp provider, expose K and V separately (e.g. -ctk q8_0 -ctv q8_0) in the generated preset.",
+   "impact": "high",
+   "effort": "S",
+   "maturity": "production"
+  },
+  {
+   "name": "Managed Ollama server with env profiles (Windows): one-click apply of server-global settings",
+   "what": "Context length, KV type, keep-alive, parallelism, VRAM margin and model path are server-global environment variables read at startup. The Windows tray app only picks them up after a quit and relaunch. Ollama ships a standalone ollama-windows-amd64.zip meant for embedding 'ollama serve' in other apps, so the desktop can own the server process and its configuration.",
+   "date": "Ollama main 2026-10-13 (v0.40.3 latest stable 2026-10-11)",
+   "concrete_claims": "envconfig vars: OLLAMA_CONTEXT_LENGTH ('default: 4k/32k/256k based on VRAM'), OLLAMA_KV_CACHE_TYPE, OLLAMA_FLASH_ATTENTION, OLLAMA_KEEP_ALIVE (5m), OLLAMA_NUM_PARALLEL (1), OLLAMA_MAX_LOADED_MODELS, OLLAMA_MAX_QUEUE (512), OLLAMA_GPU_OVERHEAD ('Reserve a portion of VRAM per GPU (bytes)'), OLLAMA_LOAD_TIMEOUT (5m), OLLAMA_MODELS, OLLAMA_NO_CLOUD, OLLAMA_VULKAN, LLAMA_ARG_FIT, LLAMA_ARG_FIT_TARGET (https://github.com/ollama/ollama/blob/main/envconfig/config.go). Windows docs: after setting env vars, 'Quit the tray application and relaunch it'. A 'standalone ollama-windows-amd64.zip … allows for embedding Ollama in existing applications, or running it as a system service via ollama serve with tools such as NSSM'. Logs are in %LOCALAPPDATA%\\Ollama (server.log) (https://github.com/ollama/ollama/blob/main/docs/windows.mdx). The llama-server child inherits the Ollama process environment (cmd.Env = os.Environ() in https://github.com/ollama/ollama/blob/main/llm/llama_server.go). v0.40.2 background-upgrades older models, and 'downgrading below 0.40 requires re-pulling the models' (https://github.com/ollama/ollama/releases).",
+   "sources": [
+    "https://github.com/ollama/ollama/blob/main/envconfig/config.go",
+    "https://github.com/ollama/ollama/blob/main/docs/windows.mdx",
+    "https://github.com/ollama/ollama/blob/main/llm/llama_server.go",
+    "https://github.com/ollama/ollama/releases"
+   ],
+   "how_we_use_it": "Add an 'Ollama mode' setting in src-tauri/src/settings.rs: 'external' (current behaviour, read-only, ollamaUrl) or 'managed'. In managed mode, Tauri starts a bundled or user-located ollama.exe serve on 127.0.0.1:11434, or a private port to avoid clashing with the tray app. It passes an env profile built from the UI (ctx, KV type, keep_alive, NUM_PARALLEL, LLAMA_ARG_FIT_TARGET, OLLAMA_MODELS on a fast NVMe) and restarts on change. It tails server.log into a 'Server log' panel and parses 'llama_params_fit' overflow lines to explain spills. Ship three presets: 'Max quality' (f16 KV, 32k), 'Agent' (q8_0 KV, 64k, keep_alive 2h) and 'Small GPU' (q4_0 KV, 32k, MoE-first model suggestions). Warn before upgrades because of the 0.40 migration.",
+   "impact": "high",
+   "effort": "M",
+   "maturity": "production"
+  },
+  {
+   "name": "Windows GPU hygiene: NVIDIA Sysmem Fallback policy, VRAM reserve for Godot, Vulkan/driver checks",
+   "what": "On Windows, the NVIDIA driver can silently spill CUDA allocations into shared system memory instead of failing. Tokens/s then collapses without an error. The desktop compositor and the Godot editor also take VRAM from the same GPU. A desktop app can detect and fix these issues.",
+   "date": "NVIDIA setting since driver 546.01 (2023); Ollama Windows notes 2026",
+   "concrete_claims": "NVIDIA added a setting to disable the shared-memory fallback in driver 546.01 and above: NVIDIA Control Panel → 'CUDA - Sysmem Fallback Policy' → 'Prefer No Sysmem Fallback'. Trade-off: stable performance 'at the risk of a crash' if more memory is needed (https://nvidia.custhelp.com/app/answers/detail/a_id/5490, https://borncity.com/blog/2023/11/26/windows-10-11-hardware-beschleunigte-gpu-planung-und-nvidia-cuda-policy/). Ollama Windows requirements: NVIDIA driver 551.61+. Vulkan is enabled by default as the AMD fallback. GGML_VK_VISIBLE_DEVICES selects the dGPU on hybrid systems. Logs are in %LOCALAPPDATA%\\Ollama\\server.log (https://github.com/ollama/ollama/blob/main/docs/windows.mdx). OLLAMA_GPU_OVERHEAD reserves VRAM per GPU in bytes (https://github.com/ollama/ollama/blob/main/envconfig/config.go). v0.30.11 fixed 'ollama ps double-counting mmap'd weights on partial offload', fixed inverted iGPU/dGPU Vulkan classification on Windows, and added sm_86 to the cuda_v13_windows preset (https://github.com/ollama/ollama/releases?page=4).",
+   "sources": [
+    "https://nvidia.custhelp.com/app/answers/detail/a_id/5490",
+    "https://borncity.com/blog/2023/11/26/windows-10-11-hardware-beschleunigte-gpu-planung-und-nvidia-cuda-policy/",
+    "https://github.com/ollama/ollama/blob/main/docs/windows.mdx",
+    "https://github.com/ollama/ollama/blob/main/envconfig/config.go",
+    "https://github.com/ollama/ollama/releases?page=4"
+   ],
+   "how_we_use_it": "Add a 'GPU health' check to StatusScreens/Settings. (1) Read the driver version with nvidia-smi and warn below 551.61. (2) Detect a spill: Windows 'Shared GPU memory' rises while nvidia-smi dedicated usage is at its cap and tok/s drops; then show a guided card for 'Prefer No Sysmem Fallback', which needs a manual Control Panel step and an app restart. (3) If godot*.exe is running, automatically raise LLAMA_ARG_FIT_TARGET / OLLAMA_GPU_OVERHEAD by the editor's measured VRAM (nvidia-smi --query-compute-apps) before loading the model. (4) Offer OLLAMA_MODELS relocation to the fastest NVMe to cut load time.",
+   "impact": "medium",
+   "effort": "S",
+   "maturity": "production"
+  }
+ ],
+ "speed-thinking": [
+  {
+   "name": "Correct speed metrics: TTFT, prefill tok/s, decode tok/s and cache-hit % per model step",
+   "what": "CodeWhale Desktop's current tok/s figure is too low because its time window includes prefill and model load. The data to fix it already exists. CodeWhale's turn.usage event carries first_token_ms, request_ms and cached-prompt tokens, and Ollama reports exact server-side timings both in its native fields and in a new `timings` block on its OpenAI-compatible endpoint.",
+   "concrete_claims": "Ollama usage fields, all in nanoseconds: total_duration, load_duration, prompt_eval_count, prompt_eval_cached_count, prompt_eval_duration ('How long it took to evaluate the uncached prompt tokens'), eval_count, eval_duration. When streaming they arrive only in the final chunk with done=true (https://github.com/ollama/ollama/blob/main/docs/api/usage.mdx, https://github.com/ollama/ollama/blob/main/api/types.go). The OpenAI-compatible /v1 endpoint maps prompt_eval_cached_count to usage.prompt_tokens_details.cached_tokens and supports stream_options.include_usage. It also attaches a llama.cpp-style `timings` object {prompt_n, prompt_ms, prompt_per_token_ms, prompt_per_second, predicted_n, predicted_ms, predicted_per_token_ms, predicted_per_second} to the finish chunk (https://github.com/ollama/ollama/blob/main/openai/openai.go ToTimings; https://github.com/ollama/ollama/blob/main/middleware/openai.go). A third-party write-up says this block has been there since 0.35.1 (https://dev.to/lognebudo/four-numbers-ollama-040-gives-you-now-and-which-ones-to-trust-3m80); the latest release is v0.40.3, 11 Oct 2026 (https://github.com/ollama/ollama/releases). Known bug: prompt_per_second divides the total prompt (cached tokens included) by the uncached-only time, so it is inflated by the cache-hit ratio. The issue's example gives 3875 tok/s instead of 125. The fix, PR #18964, was still open on 12 Oct 2026 (https://github.com/ollama/ollama/pull/18964). Compute it yourself as (prompt_n − cached_tokens)/prompt_ms. predicted_per_second is not affected. On the CodeWhale side, the TurnUsage event has usage{input_tokens, output_tokens, prompt_cache_hit_tokens, reasoning_tokens}, duration_ms, first_token_ms and request_ms (crates/protocol/src/event_msg.rs and crates/tui/src/core/engine/turn_loop/model_step.rs in https://github.com/Hmbown/CodeWhale). CodeWhale already sends stream_options.include_usage=true (crates/tui/src/client/chat.rs). Its TUI exposes `ttft` and `output_rate` status items (config.example.toml [tui].status_items).",
+   "sources": [
+    "https://github.com/ollama/ollama/blob/main/docs/api/usage.mdx",
+    "https://github.com/ollama/ollama/blob/main/openai/openai.go",
+    "https://github.com/ollama/ollama/blob/main/middleware/openai.go",
+    "https://github.com/ollama/ollama/pull/18964",
+    "https://dev.to/lognebudo/four-numbers-ollama-040-gives-you-now-and-which-ones-to-trust-3m80",
+    "https://github.com/ollama/ollama/releases",
+    "https://github.com/Hmbown/CodeWhale"
+   ],
+   "how_we_use_it": "Fix src/store/threads.ts, case 'turn.usage'. Today it computes tokPerSec = output_tokens/(duration_ms/1000), and duration_ms includes TTFT and model load. Change it to decode = output_tokens/((request_ms − first_token_ms)/1000), prefill ≈ (input_tokens − prompt_cache_hit_tokens)/(first_token_ms/1000), and cacheHit = prompt_cache_hit_tokens/input_tokens. Show four chips per model step in components/chat/Turn.tsx: TTFT, prefill tok/s, decode tok/s, cache %. Show a rolling median in layout/StatusBar.tsx. Mark the first step after a model switch as 'cold'. For exact server numbers there are two routes. (a) Upstream PR to CodeWhale: parse the `timings` block in crates/tui/src/client/chat.rs and add optional server_prompt_ms and server_predicted_ms to TurnUsage. (b) Point CodeWhale's ollama base_url at a small pass-through proxy in src-tauri/src/ollama.rs that forwards to :11434 and reads `timings` and `usage` from the final SSE chunk. Either way, apply the cached-token correction and never display Ollama's prompt_per_second as-is. A low cache % in long agent loops tells the user the prompt prefix is changing and every step re-prefills the whole context.",
+   "impact": "high",
+   "effort": "S",
+   "maturity": "production",
+   "date": "Ollama timings block: per third-party report since v0.35.1 (Sep 2026); PR #18964 opened 2026-10-12; Ollama v0.40.3 released 2026-10-11"
+  },
+  {
+   "name": "Reasoning/thinking budget control for local models",
+   "what": "On a single consumer GPU, thinking tokens dominate wall-clock time per agent step. Ollama now reports per-model thinking controls and accepts reasoning_effort over its OpenAI-compatible API. llama-server can cap thinking with a hard token budget.",
+   "date": "Ollama v0.34.3 (Sep 2026); llama.cpp README 2026-10",
+   "concrete_claims": "Ollama v0.34.3: 'GET /api/show now reports each model's thinking controls and default' (https://github.com/ollama/ollama/releases). OpenAI ChatCompletionRequest accepts 'reasoning' {effort} and 'reasoning_effort' (https://github.com/ollama/ollama/blob/main/openai/openai.go). llama-server: '--reasoning-budget N' (-1 unrestricted, 0 immediate end), '--reasoning-budget-message', and '--reasoning-effort LEVEL' ('minimal','low','medium','high','xhigh','max') (https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md). v0.32.10: models without a repeat_penalty now default to 1.0 'instead of 1.1', which the notes say speeds up speculative decoding (https://github.com/ollama/ollama/releases?page=3).",
+   "sources": [
+    "https://github.com/ollama/ollama/releases",
+    "https://github.com/ollama/ollama/blob/main/openai/openai.go",
+    "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md",
+    "https://github.com/ollama/ollama/releases?page=3"
+   ],
+   "how_we_use_it": "Read the thinking controls from /api/show in ollama_models and render a per-model 'Thinking: off/low/high' pill in the Toolbar, mapped to CodeWhale's reasoning preference, which already exists in crates/tui/src/reasoning_preference.rs. Default 'low' for edit/apply steps and 'high' for planning. For the llama.cpp provider, write reasoning-budget = 2048 into the preset as a guardrail against runaway thinking on small models such as qwen3-4b.",
+   "impact": "medium",
+   "effort": "S",
+   "maturity": "production"
+  },
+  {
+   "name": "Phase-aware thinking-budget control (think levels per step, client-side budget cap)",
+   "what": "Thinking helps on planning and debugging but wastes the token budget and can loop on routine tool steps, especially in 4B models. Newer Ollama exposes each model's thinking controls, and llama-server supports true token budgets. CodeWhale should switch thinking per step instead of per session.",
+   "concrete_claims": "- Ollama `think` accepts a boolean or a level ('low','medium','high','max') (https://github.com/ollama/ollama/blob/main/docs/api.md). Since v0.34.3 (2026-09-19), `/api/show` returns `thinking: {values, default}`. 'Numbers are not supported'. Output comes back in `message.thinking` (https://github.com/ollama/ollama/blob/main/docs/capabilities/thinking.mdx, https://github.com/ollama/ollama/releases/tag/v0.34.3).\n- /v1 accepts `reasoning_effort` / `reasoning.effort`. 'none' requests false, 'minimal' maps to low, and 'xhigh'/'ultra' map to max (https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx).\n- When streaming with tools, gather all `thinking`, `content` and `tool_calls` chunks and send them back together in the follow-up request (https://github.com/ollama/ollama/blob/main/docs/capabilities/tool-calling.mdx).\n- llama-server `--reasoning-budget N` takes -1 (unrestricted), 0 (end immediately) or N>0 (a token budget). `--reasoning-budget-message` sets text injected at the cutoff. Per request, `chat_template_kwargs: {\"enable_thinking\": false}` is available (https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md). Issue #22717 reports the budget message not appearing, after which the model 'tends to start to loop' (https://github.com/ggml-org/llama.cpp/issues/22717).\n- s1 (arXiv 2501.19393, Jan 2025): 'budget forcing', i.e. forcing end-of-thinking or appending 'Wait', controls test-time compute (https://arxiv.org/abs/2501.19393). The Qwen3 Technical Report (arXiv 2505.09388) introduces a thinking-budget mechanism (https://arxiv.org/abs/2505.09388).",
+   "sources": [
+    "https://github.com/ollama/ollama/blob/main/docs/api.md",
+    "https://github.com/ollama/ollama/blob/main/docs/capabilities/thinking.mdx",
+    "https://github.com/ollama/ollama/releases/tag/v0.34.3",
+    "https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx",
+    "https://github.com/ollama/ollama/blob/main/docs/capabilities/tool-calling.mdx",
+    "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md",
+    "https://github.com/ggml-org/llama.cpp/issues/22717",
+    "https://arxiv.org/abs/2501.19393",
+    "https://arxiv.org/abs/2505.09388"
+   ],
+   "how_we_use_it": "CodeWhale has crates/tui/src/reasoning_preference.rs and auto_reasoning.rs.\n- Desktop fills each model's effort picker from /api/show `thinking.values` instead of hardcoding.\n- Default local policy: think=false/low for routine tool steps (read, search, an edit that follows an approved plan). Use high for planning, after a failed verify gate (verify-on-edit item), and for final review.\n- Add a client-side cap for Ollama, since it has no numeric budgets. Count streamed thinking tokens and, past the budget (e.g. ~1.5k for 4B models, configurable), abort and re-issue with think=false and 'Answer now with the next action'.\n- Show thinking tokens and time separately in the turn footer.",
+   "impact": "medium",
+   "effort": "S",
+   "maturity": "production",
+   "date": "Ollama v0.34.3 (2026-09-19); llama.cpp reasoning budget 2025–2026; s1 Jan 2025"
+  },
+  {
+   "name": "Loop / hang watchdog for model loops (repetition detection, stuck patterns, turn budgets)",
+   "what": "Small and quantized local models often get stuck: repeated identical tool calls, a text chunk repeated over and over, endless 'Wait…' reasoning, or a stalled stream. Gemini CLI and the OpenHands SDK ship tested heuristics for this. CodeWhale already has opt-in step, wall-clock and stream-idle budgets that the Desktop can set.",
+   "concrete_claims": "Gemini CLI loopDetectionService defaults: TOOL_CALL_LOOP_THRESHOLD=5 identical consecutive calls (sha256 of name+args), CONTENT_LOOP_THRESHOLD=10 repeats of a CONTENT_CHUNK_SIZE=50-character chunk, code fences excluded, MAX_HISTORY_LENGTH=5000. An LLM-judge check runs after LLM_CHECK_AFTER_TURNS=30 turns, every 5–15 turns, with LLM_CONFIDENCE_THRESHOLD=0.9 (https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/services/loopDetectionService.ts). The OpenHands SDK StuckDetector covers five scenarios: same action and observation, same action and error, monologue, alternating pattern, and context-window-error loop. Default thresholds are action_observation=4, action_error=3, monologue=3, alternating_pattern=6, scanned over the last 20 events since the last user message (https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/conversation/stuck_detector.py, .../conversation/types.py). CodeWhale settings: [tui] max_model_steps, uncapped by default, 1–100000; turn_wall_clock_secs, 30–86400; env overrides CODEWHALE_MAX_MODEL_STEPS, CODEWHALE_TURN_WALL_CLOCK_SECS and CODEWHALE_STREAM_IDLE_TIMEOUT_SECS (config.example.toml, crates/tui/src/config/subagent_limits.rs, crates/tui/src/core/engine/turn_budget.rs in https://github.com/Hmbown/CodeWhale). Research: 'Wait, Wait, Wait… Why Do Reasoning Models Loop?' reports that looping is common at low temperature and that distilled students loop far more than their teachers (arXiv 2512.12895, Dec 2025, https://arxiv.org/abs/2512.12895). Qwen3 model-card guidance: do not use greedy decoding, and set presence_penalty between 0 and 2 (1.5 suggested) for 'endless repetitions' (mirror: https://friendli.ai/models/Qwen/Qwen3-1.7B-FP8). Ollama's Options accept repeat_penalty, repeat_last_n, presence_penalty and frequency_penalty (api/types.go). The Modelfile documents repeat_penalty, default 1.0 (disabled), and repeat_last_n, default 64 (https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx).",
+   "sources": [
+    "https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/services/loopDetectionService.ts",
+    "https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/conversation/stuck_detector.py",
+    "https://arxiv.org/abs/2512.12895",
+    "https://friendli.ai/models/Qwen/Qwen3-1.7B-FP8",
+    "https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx",
+    "https://github.com/Hmbown/CodeWhale"
+   ],
+   "how_we_use_it": "Add src/lib/watchdog.ts and feed it from the event switch in src/store/threads.ts. (1) On item.delta for message and reasoning text, hash 50-character chunks outside code fences and flag 10 repeats. (2) On item.started/completed for tool items, hash name+args and flag 5 identical consecutive calls, or the same call failing 3 times in a row (OpenHands action_error=3). (3) Stall: no stream.progress or item.delta for N seconds while activeTurnId is set and GPU util from item 3 is about 0. On a trigger, show a non-modal bar: 'Model looks stuck in a loop' with buttons Stop (the existing POST /v1/threads/{id}/turns/{turn_id}/interrupt), Nudge (send 'You are repeating X; try a different approach'), and Retry with anti-loop preset. The preset uses ollama_create_variant to bake presence_penalty 1.5 / repeat_penalty 1.1 and a temperature of at least 0.6 into a '-antiloop' variant, because CodeWhale does not send penalty parameters. In Settings, add a 'Local model safety' section that writes max_model_steps (e.g. 150) and turn_wall_clock_secs, and sets CODEWHALE_STREAM_IDLE_TIMEOUT_SECS on the sidecar process in src-tauri/src/runtime.rs. Log every trigger per model so the A/B scorecard (item 6) can show a 'loop rate'.",
+   "impact": "high",
+   "effort": "M",
+   "maturity": "production",
+   "date": "Gemini CLI and OpenHands SDK main as of 2026-10-13; arXiv 2512.12895 (Dec 2025)"
+  },
+  {
+   "name": "One-click model micro-benchmark (Ollama cmd/bench methodology: warmup, epochs, exact prompt sizes, VRAM)",
+   "what": "Add a reproducible 'Benchmark this model' action that measures load time, prefill tok/s and decode tok/s at several exact context sizes. It also records VRAM and GPU offload for each installed model or num_ctx variant, so users can choose the largest context that still runs 100% on GPU.",
+   "concrete_claims": "Ollama ships a benchmark tool in its repo, cmd/bench (`go run ./cmd/bench -model gemma3 -epochs 6 -format csv`). It does warmup before timed epochs, tracks TTFT per epoch, tracks VRAM and CPU memory through running-process info, and outputs benchstat or CSV. `-prompt-tokens N` makes every request exactly N prompt tokens as the server counts them, chat template included. The README notes that replay may reuse prefixes and that cached_input_tokens should be inspected (https://github.com/ollama/ollama/blob/main/cmd/bench/README.md). Native fields for the calculation: load_duration, prompt_eval_count, prompt_eval_cached_count, prompt_eval_duration (uncached only), eval_count and eval_duration (https://github.com/ollama/ollama/blob/main/docs/api/usage.mdx). Server settings that change results: OLLAMA_FLASH_ATTENTION, OLLAMA_KV_CACHE_TYPE ('default: f16'), OLLAMA_CONTEXT_LENGTH and OLLAMA_NUM_PARALLEL, default 1 (https://github.com/ollama/ollama/blob/main/envconfig/config.go).",
+   "sources": [
+    "https://github.com/ollama/ollama/blob/main/cmd/bench/README.md",
+    "https://github.com/ollama/ollama/blob/main/docs/api/usage.mdx",
+    "https://github.com/ollama/ollama/blob/main/envconfig/config.go"
+   ],
+   "how_we_use_it": "Add a Tauri command ollama_bench(model, sizes=[2k, 8k, 16k, 32k], epochs=3) in src-tauri/src/ollama.rs. It sends a cold empty-prompt load (wall-clock load time), one warmup, then timed /api/chat requests with stream=true. Each request uses a unique prompt prefix so the cache cannot inflate prefill numbers. Read prefill = (prompt_eval_count − prompt_eval_cached_count)/prompt_eval_duration and decode = eval_count/eval_duration. Sample /api/ps size_vram and NVML power during each run. Results show as a card on the Models screen: a table by context size, an offload % warning, and tok/s per watt. A 'Recommend' button picks the largest num_ctx with 100% GPU and acceptable decode speed and creates that variant with the existing ollama_create_variant. The app also displays the current FLASH_ATTENTION and KV_CACHE_TYPE so runs are comparable.",
+   "impact": "medium",
+   "effort": "S",
+   "maturity": "production",
+   "date": "Ollama main 2026-10-13"
+  }
+ ],
+ "agent-quality": [
+  {
+   "name": "Deterministic verify-on-edit loop (compile/lint feedback attached to every edit result)",
+   "what": "Run a project-specific checker automatically after every file mutation and put the result in the edit tool's own output. A small model then gets compiler feedback without having to remember to ask for it. This generalizes the existing Godot shader compile-check into a native feature (the SWE-agent 'linter guardrail' / Agentless 'patch validation' idea).",
+   "concrete_claims": "- SWE-agent ACI docs: 'We add a linter that runs when an edit command is issued, and do not let the edit command go through if the code isn't syntactically correct' (https://github.com/SWE-agent/SWE-agent/blob/main/docs/background/aci.md; paper https://arxiv.org/abs/2405.15793, 2024).\n- Agentless (arXiv 2407.01489, Jul 2024) has three phases: localization, repair, and patch validation with regression and generated reproduction tests. It reported 32.00% (96 fixes) on SWE-bench Lite at $0.70 per issue (https://arxiv.org/abs/2407.01489).\n- Godot CLI: `--check-only` means 'Only parse for errors and quit (use with --script)' (https://docs.godotengine.org/en/4.1/tutorials/editor/command_line_tutorial.html). A secondary guide warns that the exit code can be 0 on errors, so parse stderr (https://skills.sh/sethcarney/custom-plugins/godot-cli).\n- CodeWhale today (local source): crates/tui/src/tools/syntax_check.rs gates edits with syn/toml_edit/serde_json only. crates/tui/src/tools/verifier.rs `run_verifiers` supports up to 12 custom gates (MAX_CUSTOM_GATES=12, default timeout 180000 ms).\n- Tree-sitter grammars exist for Godot: tree-sitter-gdscript crate v6.1.0, MIT (https://github.com/PrestonKnopp/tree-sitter-gdscript), and tree-sitter-gdshader (https://github.com/GodOfAvacyn/tree-sitter-gdshader).",
+   "sources": [
+    "https://github.com/SWE-agent/SWE-agent/blob/main/docs/background/aci.md",
+    "https://arxiv.org/abs/2405.15793",
+    "https://arxiv.org/abs/2407.01489",
+    "https://docs.godotengine.org/en/4.1/tutorials/editor/command_line_tutorial.html",
+    "https://skills.sh/sethcarney/custom-plugins/godot-cli",
+    "https://github.com/PrestonKnopp/tree-sitter-gdscript",
+    "https://github.com/GodOfAvacyn/tree-sitter-gdshader"
+   ],
+   "how_we_use_it": "Add a per-workspace verifier map, set in Desktop settings or a `.codewhale/verify.toml`, that maps globs to commands:\n- `**/*.gdshader` → `powershell -NoProfile -File tools\\check-shader.ps1 {path}` (the user's existing script that prints COMPILES / SHADER ERRORS)\n- `**/*.gd` → `godot --headless --check-only --script {path}` (judge by stderr)\n- `*.rs` → `cargo check --message-format short`\nAfter every successful write_file/edit/apply_patch, CodeWhale runs the matching gate through the existing verifier.rs custom-gate path and appends a compact verdict (at most 12 error lines with line:col) to that tool result. The rule no longer depends on a 4B model obeying AGENTS.md. Cap auto-fix attempts at 3 per file, then escalate: raise the think level (thinking-budget item) or ask the user. Extend syntax_check.rs with tree-sitter parsing (GDScript, gdshader, TS, Python) so newly introduced syntax errors are rejected before the write. Desktop: show a green/red 'COMPILES' badge on each edited file in the diff card, with errors clickable to open at line:col.",
+   "impact": "high",
+   "effort": "S",
+   "maturity": "production",
+   "date": "SWE-agent May 2024; Agentless Jul 2024; Godot 4.x CLI docs"
+  },
+  {
+   "name": "Tool-call robustness ladder: model-specific parsers, name/arg repair, schema-constrained re-ask, text-action fallback",
+   "what": "Small local models often emit tool calls in the wrong dialect: XML instead of JSON, calls inside the text, wrong-case names, truncated args. A layered repair ladder recovers most of these cheaply. Ending it with a grammar-constrained regeneration of only the arguments turns 'model broke the loop' into a single extra call.",
+   "concrete_claims": "- Ollama has per-model output parsers selected by name, including 'qwen3', 'qwen3-thinking', 'qwen3-coder', 'harmony', 'deepseek3', 'gemma4', 'ministral' and more (https://github.com/ollama/ollama/blob/main/model/parsers/parsers.go). Qwen3-Coder emits XML-style calls: `<tool_call><function=NAME><parameter=K>v</parameter></function></tool_call>` (vLLM qwen3coder parser, https://docs.vllm.ai/en/v0.10.2/api/vllm/entrypoints/openai/tool_parsers/qwen3coder_tool_parser.html).\n- Ollama /v1 does NOT support `tool_choice` (https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx). Streaming with tool calls has been supported since 2025-05-28 (https://ollama.com/blog/streaming-tool).\n- llama.cpp has native tool-call handlers for Llama 3.x, Functionary, Hermes 2/3 / Qwen 2.5, Mistral Nemo, Firefunction v2, Command R7B, DeepSeek R1 and GPT-OSS. Other templates fall back to 'Chat format: Generic'. `\"parallel_tool_calls\": true` is off by default. Lazy grammars came in PR #9639, with trigger patterns in PR #12034 (https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md).\n- Vercel AI SDK `repairToolCall` docs: 'Language models sometimes fail to generate valid tool calls, especially when the input schema is complex or the model is smaller'. The strategies it lists are regenerating inputs with structured outputs, asking a stronger model, or re-asking (https://github.com/vercel/ai/blob/main/content/docs/03-ai-sdk-core/15-tools-and-tool-calling.mdx).\n- Ollama `format` accepts a JSON schema, and the docs say 'It is ideal to also pass the JSON schema as a string in the prompt' (https://github.com/ollama/ollama/blob/main/docs/capabilities/structured-outputs.mdx).\n- mini-SWE-agent has only bash and 'doesn't even need to use the tool-calling interface of the LMs'. It scores >74% on SWE-bench Verified with frontier models (https://github.com/SWE-agent/mini-swe-agent).",
+   "sources": [
+    "https://github.com/ollama/ollama/blob/main/model/parsers/parsers.go",
+    "https://docs.vllm.ai/en/v0.10.2/api/vllm/entrypoints/openai/tool_parsers/qwen3coder_tool_parser.html",
+    "https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx",
+    "https://ollama.com/blog/streaming-tool",
+    "https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md",
+    "https://github.com/vercel/ai/blob/main/content/docs/03-ai-sdk-core/15-tools-and-tool-calling.mdx",
+    "https://github.com/ollama/ollama/blob/main/docs/capabilities/structured-outputs.mdx",
+    "https://github.com/SWE-agent/mini-swe-agent"
+   ],
+   "how_we_use_it": "CodeWhale already has crates/tui/src/tools/arg_repair.rs (a 5-stage JSON ladder that flags structure_synthesized) and crates/core/src/tool_parser.rs (text fallback for [TOOL_CALL], <codewhale:tool_call>, <tool_call, <invoke). Extend it in four ways:\n(a) Add parsers for the Qwen3-Coder `<function=..><parameter=..>` XML, Mistral `[TOOL_CALLS]`, and fenced ```json {name, arguments}``` blocks.\n(b) Repair tool names: case-fold, strip '_tool', and fuzzy-match against the registry. file.rs already aliases argument names.\n(c) Schema-constrained re-ask. When args fail schema validation or arg_repair synthesized structure, make one hidden non-streamed native POST /api/chat with `format` = that tool's input schema, think=false, and the last few messages plus 'Re-emit only the arguments for <tool>'. Splice the result in without polluting history.\n(d) Capability gate. If /api/show capabilities lacks 'tools', switch the session to a text-action protocol (one fenced action block per turn, mini-SWE-agent style) parsed by tool_parser.rs.\nIn Desktop, mark repaired tool cards with a 'repaired' chip, and record per-model repair and failure rates in crates/tui/src/scorecard.rs so the model picker can warn about unreliable models. Make sure Desktop-created num_ctx variants inherit from the official tag (`from`) so Ollama's model-specific parser/renderer still applies, and check that /api/show still lists 'tools'.",
+   "impact": "high",
+   "effort": "M",
+   "maturity": "production",
+   "date": "Ollama parsers current Oct 2026; Ollama streaming tool calls 2025-05-28; AI SDK docs current"
+  },
+  {
+   "name": "Tool-call reliability guardrails for Qwen-family models on Ollama (strict XML parser failures)",
+   "what": "Qwen3.x tool calls are an XML-like format that Ollama converts and then parses with Go's strict xml.Unmarshal. There are open reports of intermittent HTTP 500s, and of deterministic failures on long file-write tool calls, where the parse error comes back to the client as the assistant's answer. A coding agent that writes whole shader files is the riskiest case.",
+   "date": "Issues filed 2026; parser code read from ollama main 2026-10-13",
+   "concrete_claims": "Ollama maps parser names `qwen3.5` -> Qwen35Parser and `qwen3-coder` -> Qwen3CoderParser (https://raw.githubusercontent.com/ollama/ollama/main/model/parsers/parsers.go). The Qwen3Coder parser runs `transformToXML(raw)` and then `xml.Unmarshal` (https://raw.githubusercontent.com/ollama/ollama/main/model/parsers/qwen3coder.go). Issue #16383 reports that qwen3.6 tags register PARSER qwen3.5 and that Ollama intermittently returns 500 when the model drifts from its template (https://github.com/ollama/ollama/issues/16383). Issue #18563 reports that the strict XML step 'rejects long file-write tool calls ... deterministically, and the client gets the error as the answer'; related PR #18571 (https://github.com/ollama/ollama/issues/18563). Issue #17276 reports intermittent failures in longer multi-step sessions (https://github.com/ollama/ollama/issues/17276). For GLM-4.7-Flash, Unsloth advised against Ollama because of chat-template issues (https://unsloth.ai/docs/models/tutorials/glm-4.7-flash); Ollama now ships a dedicated `glm-4.7` parser (parsers.go). gpt-oss Harmony has a known problem with parallel tool calls in BFCL-style tests (https://arxiv.org/pdf/2605.07731). Mistral recommends temperature below 0.1 and a small tool set for Ministral 3 (https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512).",
+   "sources": [
+    "https://raw.githubusercontent.com/ollama/ollama/main/model/parsers/parsers.go",
+    "https://raw.githubusercontent.com/ollama/ollama/main/model/parsers/qwen3coder.go",
+    "https://github.com/ollama/ollama/issues/16383",
+    "https://github.com/ollama/ollama/issues/18563",
+    "https://github.com/ollama/ollama/issues/17276",
+    "https://unsloth.ai/docs/models/tutorials/glm-4.7-flash",
+    "https://arxiv.org/pdf/2605.07731"
+   ],
+   "how_we_use_it": "On the desktop side, the event stream from the CodeWhale sidecar should flag an assistant message that contains an Ollama parse error (for example 'closed by', 'unmarshal', or HTTP 500 from /v1/chat/completions). Show a 'Tool-call parse failure' chip with an automatic retry that adds an instruction to use the patch/edit tool or write in chunks of no more than about 200 lines. Count failures per model in local settings and show them on the model card. Add a 'Tool-call reliability' smoke test (see the acceptance-test item) that runs a 400-line file write through the real toolset before a model is marked 'Agent-ready'. Pin the minimum Ollama version per model family in the catalog (for example qwen3.8 needs the v0.34 line), checked via /api/version, which ollama_status already reads.",
+   "impact": "high",
+   "effort": "M",
+   "maturity": "beta"
+  },
+  {
+   "name": "Lean tool surface and small-model-friendly ACI (tool-count reduction plus deferred tools)",
+   "what": "Small models choose tools far worse when many are offered, and every tool schema eats tokens from a 4k–32k window. Exposing about 8 core tools with flat schemas, keeping the rest behind a search meta-tool, and using SWE-agent-style concise outputs makes local models markedly more reliable.",
+   "concrete_claims": "- Less-is-More (arXiv 2411.15399, Nov 2024) dynamically reduces the tools offered to the model. It cut execution time by up to 70% and power by up to 40% on edge devices (BFCL/GeoEngine) (https://arxiv.org/abs/2411.15399). CarbonCall (arXiv 2504.20348) notes that smaller edge models struggle to pick the right tool from a large set (https://arxiv.org/abs/2504.20348).\n- mini-SWE-agent has about 100 lines of agent code and bash only. It scores >74% on SWE-bench Verified, and the SWE-bench 'Bash Only' leaderboard runs every model in it (https://github.com/SWE-agent/mini-swe-agent, https://www.swebench.com/bash-only.html).\n- SWE-agent ACI findings: a 100-line file viewer works best. The search tool lists only the files that match, because 'Showing the model more context about each match proved to be too confusing for the model'. Empty output returns an explicit 'ran successfully and did not produce any output' message (https://github.com/SWE-agent/SWE-agent/blob/main/docs/background/aci.md).\n- Aider: 'Above about 25k tokens of context, most models start to become distracted and become less likely to conform to their system prompt' (https://aider.chat/docs/troubleshooting/edit-errors.html).\n- CodeWhale (local source) has about 95 ToolSpec implementations, a `defer_loading` flag (crates/tui/src/tools/registry.rs), and catalog meta-tools `tool_search` / `tool_search_tool_bm25` (crates/tui/src/extension_host/registry.rs).",
+   "sources": [
+    "https://arxiv.org/abs/2411.15399",
+    "https://arxiv.org/abs/2504.20348",
+    "https://github.com/SWE-agent/mini-swe-agent",
+    "https://www.swebench.com/bash-only.html",
+    "https://github.com/SWE-agent/SWE-agent/blob/main/docs/background/aci.md",
+    "https://aider.chat/docs/troubleshooting/edit-errors.html"
+   ],
+   "how_we_use_it": "Add a 'Local-lean' tool profile. It is selected automatically for Ollama routes whose /api/show details.parameter_size is ≤14B, and the user can switch Lean/Full in Desktop model settings.\n- Send only these core tools: read_file (100–200-line windows), search (ripgrep, returning a file list first), edit (search/replace), write_file, shell, run_verifiers, todo, and tool_search.\n- Give each a one-line description and a flat JSON schema (no oneOf, no deep nesting).\n- Mark everything else defer_loading=true behind tool_search (BM25).\n- Slim the system prompt for this profile.\n- Normalize empty outputs to an explicit success line.\nDesktop shows the prefix cost, e.g. 'system+tools: 3.1k of 32k tokens', so users can see what the lean profile saves.",
+   "impact": "high",
+   "effort": "M",
+   "maturity": "production",
+   "date": "Less-is-More Nov 2024; mini-SWE-agent 2025-2026; SWE-agent ACI 2024"
+  },
+  {
+   "name": "Client-executed dynamic tools (CodeWhale Runtime API): desktop-native tools for Godot, GPU, screenshots",
+   "what": "CodeWhale's app-server lets a client register its own tools on a thread or turn. The model calls them, the Runtime emits an SSE event, and the desktop runs the tool locally and posts the result back, which can be text or images. This is the most direct way to give a small local model reliable, deterministic tools without writing an MCP server.",
+   "date": "Present in CodeWhale 0.10.2 (2026-10-10); source checked at commit 182bafe (2026-10-13)",
+   "concrete_claims": "POST /v1/threads and POST /v1/threads/{id}/turns accept `dynamic_tools: [{namespace?, name, description, input_schema, defer_loading?}]` (DynamicToolSpec; ${SRC}/crates/protocol/src/runtime/mod.rs:195-217; test ${SRC}/crates/tui/src/runtime_api/tests.rs:10320 `create_thread_accepts_dynamic_tools_and_environments`, :10409 `start_turn_accepts_dynamic_tools_and_environment_id`). When the model calls one, the Runtime emits SSE `tool_call.requested` with {thread_id, turn_id, call_id, namespace, tool, arguments} (${SRC}/crates/tui/src/runtime_threads.rs:19326-19346). The client answers with `POST /v1/threads/{thread_id}/turns/{turn_id}/tool-calls/{call_id}/result` and body `{success, content:[{type:\"input_text\",text}|{type:\"input_image\",image_url}]}` (mod.rs:253-270). Exactly one of `tool_call.resolved`, `tool_call.timeout` or `tool_call.canceled` becomes durable, and 202 means the result was durably accepted (${SRC}/docs/RUNTIME_API.md:1425-1447, https://github.com/Hmbown/CodeWhale/blob/main/docs/RUNTIME_API.md). Dynamic tools are NOT available over the ACP transport (RUNTIME_API.md:718). Today the desktop sends no dynamic_tools and limits `allowed_tools` to LITE_TOOLS = [read, write, edit, bash, todo_write] (/home/user/LOCAL_AGENT_PROJECT/codewhale-desktop/src/lib/tools.ts:68; src/store/app.ts newThread/sendPrompt).",
+   "sources": [
+    "https://github.com/Hmbown/CodeWhale/blob/main/docs/RUNTIME_API.md",
+    "/tmp/claude-0/-home-user-LOCAL-AGENT-PROJECT/dfc6ae91-fcd0-5718-90b8-d857a427b4cb/scratchpad/cw-src/crates/protocol/src/runtime/mod.rs",
+    "/tmp/claude-0/-home-user-LOCAL-AGENT-PROJECT/dfc6ae91-fcd0-5718-90b8-d857a427b4cb/scratchpad/cw-src/crates/tui/src/runtime_threads.rs",
+    "/home/user/LOCAL_AGENT_PROJECT/codewhale-desktop/src/lib/tools.ts"
+   ],
+   "how_we_use_it": "Add a `desktop` namespace of Tauri-implemented tools to the newThread/sendPrompt body. (1) `godot.check_shader {path}` runs tools\\check-shader.ps1 with the custom Godot 4.8 binary and returns COMPILES or the compiler errors as input_text. It replaces the fragile 'bash + PowerShell 5.1 quoting' loop from AGENTS.md with one schema-validated call. (2) `godot.render_preview {path, frames}` renders the shader to a PNG and returns it as an input_image data URL, so a vision model in Ollama can look at the result. (3) `system.vram` / `ollama.ps` report free VRAM and loaded models, so the agent can reason about context size. Handle `tool_call.requested` in src/hooks/useBootstrap.ts and src/store/threads.ts, and show a 'running locally' card with a Cancel button that posts `{success:false}`. Put the namespaced names into allowed_tools; check whether the Runtime expects the `<namespace>::<name>` spelling. Keep descriptions short, because each tool's schema costs context on a 32k model.",
+   "impact": "high",
+   "effort": "M",
+   "maturity": "production"
+  }
+ ],
+ "safety-ecosystem": [
+  {
+   "name": "Checkpoints / Rewind UI over CodeWhale's side-git snapshots",
+   "what": "CodeWhale already keeps side-git workspace snapshots and exposes conversation-and-code rewind routes. The desktop only offers 'fork' today. A Claude-Code-style rewind menu on every user turn would make experimenting with weak local models safe: try, rewind, retry.",
+   "date": "CodeWhale 0.10.2 (2026-10-10); Claude Code checkpointing docs (current, 2026)",
+   "concrete_claims": "Routes: `POST /v1/threads/{id}/fork-at-turn {turn_id}` keeps that turn and everything before it, and returns `original_user_text` for the composer; it never rolls back files. `POST /v1/threads/{id}/patch-undo {depth}` rolls back the files the dropped turns changed, then forks, and returns `patch_result{files_restored, summary, snapshot_label}`. `POST /v1/threads/{id}/file-revert {path, snapshot_id, expected_hash}` restores exactly one file. `POST /v1/threads/{id}/retry {depth, prompt}`. `GET /v1/snapshots?limit=` and `POST /v1/snapshots/{id}/restore` take a `pre-restore:` safety snapshot first and return 409 while a turn is active (${SRC}/docs/RUNTIME_API.md:1210-1214, 1493-1524). Snapshot config: `[snapshots].enabled` (default true) and `max_age_days` (default 7); snapshots are stored in `~/.codewhale/snapshots/<project_hash>/<worktree_hash>/.git` and never in the project's own .git (${SRC}/docs/CONFIGURATION.md:2552-2558). For comparison, Claude Code's /rewind offers 'Restore code and conversation / Restore conversation / Restore code / Summarize from here', and it does NOT track files changed by Bash commands (https://code.claude.com/docs/en/checkpointing). The desktop already handles `turn.workspace_snapshot` and `thread.forked` events (codewhale-desktop/src/store/threads.ts:222,277) but calls only forkThread.",
+   "sources": [
+    "https://github.com/Hmbown/CodeWhale/blob/main/docs/RUNTIME_API.md",
+    "https://github.com/Hmbown/CodeWhale/blob/main/docs/CONFIGURATION.md",
+    "https://code.claude.com/docs/en/checkpointing"
+   ],
+   "how_we_use_it": "Add a hover menu on each user message in src/components/chat/Turn.tsx with four actions. 'Rewind conversation' calls fork-at-turn with that turn_id and puts the original text back in the composer. 'Rewind conversation + files' calls patch-undo with a depth computed by the server, not counted in the client, and shows files_restored. 'Retry with another model' calls retry. 'Restore this file' sits in the DiffView and calls file-revert. Add a 'Snapshots' tab to the Inspector that lists GET /v1/snapshots with a guarded Restore button, disabled while a turn runs (the server returns 409). Map 409 'already has an active turn' to a clear toast. For a Godot workspace on F:, show the snapshot age limit and add a settings toggle for max_age_days.",
+   "impact": "high",
+   "effort": "M",
+   "maturity": "production"
+  },
+  {
+   "name": "Server-side approval policy: permission posture, scoped grants, permissions.toml and Auto-Review instead of client auto-approve",
+   "what": "The desktop currently auto-approves by bare tool name on the client, so 'bash' means every command. CodeWhale already has a layered, monotonic authorization pipeline: hooks, typed rules, a deterministic Auto-Review floor plus a model guardian, repo law, and session grants scoped to a command family. The desktop should drive that pipeline instead of bypassing it.",
+   "date": "CodeWhale 0.10.2 (2026-10-10); Claude Code auto mode: engineering post 2026-03-25, made the default in August 2026",
+   "concrete_claims": "Desktop auto-approve: useBootstrap.ts:57-64 calls `decideApproval(...true)` whenever `settings.autoApprove[tool]` is set (/home/user/LOCAL_AGENT_PROJECT/codewhale-desktop/src/hooks/useBootstrap.ts). Runtime: `POST /v1/threads` accepts `permission_posture` (\"ask\", \"auto-review\", ...), normalized to `auto_review` (${SRC}/crates/tui/src/runtime_api/tests.rs:10361-10375). `POST /v1/approvals/{id} {decision, remember}`: with remember=true it records a session grant scoped to a command family (for example `git status` with value-free options) or to the exact command. The Runtime emits `approval.grant_added` and supports `DELETE /v1/threads/{id}/approval-grants/{grant_id}`. `GET /v1/approvals?limit=` returns a redacted history with outcome and decided_by (user, session_rule, posture, host) (${SRC}/docs/RUNTIME_API.md:1338-1407). The authorization order has 9 layers; hooks resolve deny > ask > allow, and typed rules in `permissions.toml` rank User > Agent > BuiltinDefault (${SRC}/docs/AUTHORIZATION_ORDER.md). `[auto_review]` allow/block rules match `tool` and/or `action_kind` (read, write, shell, external, publish, destructive). Fallback holds go to ONE stateless guardian model call, and anything that fails fails closed (${SRC}/docs/CONFIGURATION.md:2362-2407; ${SRC}/docs/MODES.md:195-220). Industry context: Anthropic's classifier-based auto mode (https://www.anthropic.com/engineering/claude-code-auto-mode) became Claude Code's default in August 2026 (https://9to5mac.com/2026/08/14/psa-claude-code-enabling-auto-mode-as-default-next-week-anthropic-says/).",
+   "sources": [
+    "https://github.com/Hmbown/CodeWhale/blob/main/docs/AUTHORIZATION_ORDER.md",
+    "https://github.com/Hmbown/CodeWhale/blob/main/docs/MODES.md",
+    "https://github.com/Hmbown/CodeWhale/blob/main/docs/RUNTIME_API.md",
+    "https://www.anthropic.com/engineering/claude-code-auto-mode",
+    "https://9to5mac.com/2026/08/14/psa-claude-code-enabling-auto-mode-as-default-next-week-anthropic-says/"
+   ],
+   "how_we_use_it": "(1) Replace the per-tool autoApprove map with a posture chip in the Toolbar (Ask / Auto-Review / Full Access). It sends `permission_posture` on POST /v1/threads and PATCH. (2) The 'Allow for session' button already sends remember=true; add a 'Granted' list in the Inspector that reads `approval_grants[]` from thread detail and offers Revoke. (3) Add an 'Approvals log' panel backed by GET /v1/approvals. (4) Add a Settings page that edits typed `permissions.toml` rules, for example allow `git status` / `git diff`, deny `Remove-Item -Recurse` outside the workspace, and ask for `git push`. Add `[auto_review]` allow rules for action_kind=read. (5) Caveat for the UI: on one GPU the Auto-Review guardian is an extra inference call on the same local model, and a 4B model is a weak safety judge. Default to Ask plus deterministic rules, and offer Auto-Review only for larger models.",
+   "impact": "high",
+   "effort": "M",
+   "maturity": "production"
+  },
+  {
+   "name": "Windows command sandboxing gap: honest status now, real isolation later (restricted token/ACL, LPAC AppContainer, Windows Sandbox)",
+   "what": "On Windows, CodeWhale runs model-proposed shell commands with NO OS sandbox. It only places them in a Job Object for kill-on-close and memory limits. Approvals are the only control. Proven Windows designs exist: OpenAI Codex uses a restricted-token plus ACL sandbox, CodeWhale's own extension host already runs plugins in an LPAC AppContainer, and Windows Sandbox has a CLI.",
+   "date": "CodeWhale docs at 2026-10-13; Codex Windows sandbox issues open as of 2026-10-09; wsb CLI ships with Windows 11 24H2",
+   "concrete_claims": "CodeWhale: 'The Windows command path currently reports no OS sandbox'. The source tree has only a future Job Object helper contract, with no read-only/workspace-write enforcement, network blocking, or restricted-token/AppContainer isolation (${SRC}/docs/SANDBOX.md, Windows section). Shell children are put in a Job with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE (${SRC}/crates/tui/src/tools/shell.rs:37-40,700-704), and process_tree.rs can add JOB_OBJECT_LIMIT_PROCESS_MEMORY (lines 579-599). The extension host already uses 'a freshly created LPAC AppContainer with no network capabilities' and verifies the token (${SRC}/crates/tui/src/extension_host/supervisor.rs:49-54; windows.rs uses CreateAppContainerProfile). An external option is `sandbox_backend = \"opensandbox\"` with `sandbox_url`; unsupported backends refuse shell (SANDBOX.md). Codex: the crate `codex-rs/windows-sandbox-rs` (https://github.com/openai/codex/tree/main/codex-rs/windows-sandbox-rs; repo licence Apache-2.0) is configured with `[windows] sandbox = \"elevated\"|\"unelevated\"`. Issue #52427 (opened 2026-10-09, still open) reports elevated setup failing on an ACL refresh with codex-cli 0.162.0-alpha.2 (https://github.com/openai/codex/issues/52427). Design write-up: https://openai.com/index/building-codex-windows-sandbox/. Windows Sandbox CLI `wsb` (start / exec / share / stop, `--raw` JSON) is available from Windows 11 24H2 (https://learn.microsoft.com/en-us/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-cli).",
+   "sources": [
+    "https://github.com/Hmbown/CodeWhale/blob/main/docs/SANDBOX.md",
+    "/tmp/claude-0/-home-user-LOCAL-AGENT-PROJECT/dfc6ae91-fcd0-5718-90b8-d857a427b4cb/scratchpad/cw-src/crates/tui/src/extension_host/supervisor.rs",
+    "https://openai.com/index/building-codex-windows-sandbox/",
+    "https://github.com/openai/codex/tree/main/codex-rs/windows-sandbox-rs",
+    "https://github.com/openai/codex/issues/52427",
+    "https://learn.microsoft.com/en-us/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-cli"
+   ],
+   "how_we_use_it": "Short term (S): read `codewhale doctor --json` (sandbox_available) at startup and show a red 'No OS sandbox (Windows)' chip in the StatusBar. While it shows, block 'Full Access' unless the user confirms, and default new threads to Ask. Medium term (M): add an optional 'Disposable run' button that copies the workspace into a Windows Sandbox (`wsb start`, then `wsb share --allow-write` on a scratch copy, then `wsb exec`) for risky scripts. This cannot run the Godot GPU editor, so it is for build and test scripts only. Long term (L, upstream PR to CodeWhale): implement the Windows `workspace-write` wrapper, either by reusing the LPAC AppContainer code already in extension_host/windows.rs (grant the AppContainer SID on the workspace; risk: dev tools and the GPU may break under LPAC) or by adopting Codex's Apache-2.0 restricted-token plus synthetic-SID ACL approach, while learning from its open setup bugs. The OpenSandbox/Docker backend is not suitable for the Godot loop, because the Windows Godot binary cannot run in a Linux container.",
+   "impact": "high",
+   "effort": "L",
+   "maturity": "experimental"
+  },
+  {
+   "name": "Agent Skills (SKILL.md open standard): skills manager, explicit activation and auto-suggest for small models",
+   "what": "Agent Skills is the cross-vendor SKILL.md format (published December 2025) and loads in stages: metadata first, then the body, then resources. CodeWhale discovers SKILL.md from its own roots and from compatible roots, and exposes listing, detail, install, trust, audit and update through the Runtime API. The desktop has no skills UI, although the user's Godot workflow depends on a `godot-shaders` skill.",
+   "date": "Spec published 2025-12-18; CodeWhale 0.10.2 (2026-10-10)",
+   "concrete_claims": "Spec (https://raw.githubusercontent.com/agentskills/agentskills/main/docs/specification.mdx): required `name` (1-64 chars: lowercase letters, digits and hyphens; must match the directory) and `description` (1-1024 chars); optional `license`, `compatibility` (1-500 chars), `metadata`, and `allowed-tools` (experimental). Folders are scripts/, references/ and assets/. Disclosure is staged: metadata about 100 tokens, body under 5000 tokens recommended, SKILL.md under 500 lines. Validate with `skills-ref validate ./my-skill`. CodeWhale: routes `GET /v1/skills`, `GET /v1/skills/{name}` (full body; advertised as `capabilities.skill_detail` on /v1/runtime/info), `/v1/skills/install`, `/{name}/trust`, `/{name}/audit`, `/{name}/update` (${SRC}/docs/RUNTIME_API.md:1777-1798; route list in ${SRC}/crates/tui/src/runtime_api.rs). Writable roots are `<workspace>/.codewhale/skills/` and `~/.codewhale/skills/`. Read-only compatible roots include `.agents/skills` and `.claude/skills`. Workspace roots load only once the workspace is trusted (${SRC}/docs/SKILLS.md). `invocation: explicit-only` or `disable-model-invocation: true` keeps a skill out of the model catalogue. CodeWhale only WARNS on `allowed-tools`, `model`, `context` and `agent`, which grant no authority (${SRC}/docs/SKILLS.md:141-170).",
+   "sources": [
+    "https://raw.githubusercontent.com/agentskills/agentskills/main/docs/specification.mdx",
+    "https://agentskills.io/specification",
+    "https://github.com/Hmbown/CodeWhale/blob/main/docs/SKILLS.md",
+    "https://github.com/Hmbown/CodeWhale/blob/main/docs/RUNTIME_API.md"
+   ],
+   "how_we_use_it": "(1) A 'Skills' side panel in src/components/overlays/SidePanels.tsx lists GET /v1/skills with source, enabled and trust badges, offers Install from a GitHub URL or folder, and shows audit output. (2) In the Composer, typing '/' or '$' opens a skill picker. Choosing a skill fetches GET /v1/skills/{name} and prepends an activation instruction to the next prompt, the same way TUI `/skill <name>` does. This matters because a 4B model often fails to call load_skill on its own. (3) Auto-suggest: when the prompt or an attached file mentions `.gdshader`, show a chip 'Use godot-shaders skill'. (4) Show the token cost of the skill catalogue in the context meter, and offer to mark rarely used skills `invocation: explicit-only` to save prompt budget on 32k models. (5) Warn in the UI that `allowed-tools` in imported Claude skills is ignored by CodeWhale.",
+   "impact": "high",
+   "effort": "S",
+   "maturity": "production"
+  },
+  {
+   "name": "AGENTS.md (AAIF standard): instruction-sources inspector and editor",
+   "what": "AGENTS.md is the cross-agent project-instructions convention. It is now governed by the Linux Foundation's Agentic AI Foundation together with MCP and goose. CodeWhale loads AGENTS.md as its project instructions and exposes the sources it actually loaded through a route. The user's repo already has an AGENTS.md with Russian-language and PowerShell 5.1 rules.",
+   "date": "AAIF launched 2025-12-09; 247 member organisations per the 2026-08-13 Linux Foundation release",
+   "concrete_claims": "AAIF hosts MCP (contributed by Anthropic), goose (Block) and AGENTS.md (OpenAI) (https://sdtimes.com/ai/linux-foundation-forms-agentic-ai-foundation-to-be-new-home-for-mcp-goose-and-agents-md/; https://www.linuxfoundation.org/press/agentic-ai-foundation-welcomes-57-new-members-gaining-major-financial-services-players-and-apac-leaders). AGENTS.md FAQ: 'The closest AGENTS.md to the edited file wins; explicit user chat prompts override everything'; no fields are required (https://raw.githubusercontent.com/agentsmd/agents.md/main/components/FAQSection.tsx). CodeWhale: AGENTS.md is the cross-agent project instruction file; `WHALE.md` is deprecated (${SRC}/docs/CONFIGURATION.md:66-154). `GET /v1/workspace/instructions` returns the effective instruction sources, whether a generated fallback is in use, and warnings (${SRC}/crates/tui/src/runtime_api/workspace.rs:863-890; route at runtime_api.rs:2408). `[context].project_pack` (default false) adds a directory listing to the stable prefix and is described as 'useful for weak tool-calling models' (CONFIGURATION.md:2559-2563).",
+   "sources": [
+    "https://sdtimes.com/ai/linux-foundation-forms-agentic-ai-foundation-to-be-new-home-for-mcp-goose-and-agents-md/",
+    "https://www.linuxfoundation.org/press/agentic-ai-foundation-welcomes-57-new-members-gaining-major-financial-services-players-and-apac-leaders",
+    "https://github.com/agentsmd/agents.md",
+    "https://github.com/Hmbown/CodeWhale/blob/main/docs/CONFIGURATION.md"
+   ],
+   "how_we_use_it": "Add a 'Context' tab in the Inspector that calls GET /v1/workspace/instructions. It lists every loaded file (global, then repo, then nested), shows the token estimate of each against /v1/threads/{id}/context window_tokens, flags warnings and a deprecated WHALE.md, and has an 'Edit' button that opens the file via PUT /v1/workspace/files. Add a 'Create AGENTS.md' wizard with sections for the build/test command, the shell (PowerShell 5.1), the language, and the Godot compile-check command, kept short for 32k models. Add a toggle for `[context].project_pack` for weak tool-calling models.",
+   "impact": "medium",
+   "effort": "S",
+   "maturity": "production"
+  }
+ ],
+ "desktop-ux": [
+  {
+   "name": "Streamdown 2.7 + remend: incremental markdown renderer for streaming replies",
+   "date": "streamdown 2.7.0 and remend 1.4.0 published 2026-09-30; @streamdown/code 2.0.0 the same day",
+   "what": "Vercel's drop-in replacement for react-markdown, built for LLM streams. It splits the text into blocks with the marked lexer, memoizes each block so finished blocks never re-render, and closes unterminated `**`, code fences, links and so on with remend before parsing. It also has a caret, link-safety and rehype-harden.",
+   "concrete_claims": "\"A drop-in replacement for react-markdown, designed for AI-powered streaming\" (https://github.com/vercel/streamdown). Block-level memoization: \"Only blocks with changed content are re-rendered\" (https://github.com/vercel/streamdown/blob/main/apps/website/content/docs/memoization.mdx). Props: `parseIncompleteMarkdown` (default true), `mode: \"streaming\"|\"static\"`, `isAnimating`, `caret: \"block\"|\"circle\"`, `components`, `linkSafety` (confirmation modal on by default) (https://github.com/vercel/streamdown/tree/main/apps/website/content/docs). Peer dependency react ^18 || ^19. It depends on marked, unified and remark-gfm; @streamdown/code needs shiki ^4.4.3 (https://www.npmjs.com/package/streamdown, https://www.npmjs.com/package/@streamdown/code). Tailwind v4 needs `@source \"../node_modules/streamdown/dist/*.js\"` in the CSS.",
+   "sources": [
+    "https://github.com/vercel/streamdown",
+    "https://streamdown.ai/docs/memoization",
+    "https://streamdown.ai/docs/termination",
+    "https://www.npmjs.com/package/streamdown",
+    "https://www.npmjs.com/package/remend"
+   ],
+   "how_we_use_it": "src/components/chat/Markdown.tsx now runs `<ReactMarkdown remarkPlugins={[remarkGfm]}>` over the whole message on every token. That is O(n) re-parsing per delta, and long answers stutter. Swap it for `<Streamdown mode={streaming?'streaming':'static'} isAnimating={streaming} caret=\"block\" components={{code: CodeBlock, a: TauriLink}} linkSafety={{enabled:false}}>`. Keep the existing CodeBlock (Shiki 4.5) and the `openUrl` link handler, and set `linkSafety` off or use `onLinkCheck`, because links are already routed through the opener plugin. Add the Tailwind `@source` line to src/index.css. Result: completed paragraphs and code blocks freeze, half-typed bold or fences render correctly, and CPU use during long generations drops.",
+   "impact": "high",
+   "effort": "S",
+   "maturity": "production"
+  },
+  {
+   "name": "Drag-and-drop and paste images for vision models, downscaled to CodeWhale's limits",
+   "date": "Tauri 2.12 (2026-09-26); CodeWhale protocol limits are on current main",
+   "what": "Use Tauri's native webview drag-drop event, which gives real file paths from Explorer, plus Tauri 2.12's new permission handler (ClipboardRead and Microphone kinds). Re-encode and downscale images in Rust so attachments always pass CodeWhale's server-side image validation.",
+   "concrete_claims": "The CodeWhale protocol allows at most 10 images, 4 MiB per image and 5 MiB in total (MAX_RUNTIME_IMAGES, MAX_RUNTIME_IMAGE_BYTES, MAX_RUNTIME_IMAGE_TOTAL_BYTES). `prepare_runtime_images` fails with \"images exceed the 5 MiB total limit\" and has a decode guard of about 33.5 megapixels (https://github.com/Hmbown/CodeWhale/blob/main/crates/protocol/src/runtime/mod.rs, https://github.com/Hmbown/CodeWhale/blob/main/crates/tui/src/image_attach.rs). Tauri window config `dragDropEnabled` defaults to true: \"Disabling it is required to use HTML5 drag and drop on the frontend on Windows since we replace the drag drop handler of WebView2\" (@tauri-apps/cli config.schema.json, https://docs.rs/tauri/latest/tauri/webview/struct.WebviewBuilder.html#method.disable_drag_drop_handler). `getCurrentWebview().onDragDropEvent` delivers enter, over, drop and leave with `paths` and a physical-pixel `position` (https://v2.tauri.app/reference/javascript/api/namespacewebview/). Tauri 2.12 adds `on_permission_request` (https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/blog/tauri-2.12.mdx). PermissionKind includes Microphone, Camera, Notifications, ClipboardRead and DisplayCapture (https://github.com/tauri-apps/tauri/blob/dev/crates/tauri-runtime/src/webview_permissions.rs). Resizing crates: image 0.25.10, fast_image_resize 6.1.0 (https://crates.io/crates/image, https://crates.io/crates/fast_image_resize). Ollama /api/chat takes base64 `images` (https://github.com/ollama/ollama/blob/main/docs/api.md).",
+   "sources": [
+    "https://github.com/Hmbown/CodeWhale/blob/main/crates/protocol/src/runtime/mod.rs",
+    "https://github.com/Hmbown/CodeWhale/blob/main/crates/tui/src/image_attach.rs",
+    "https://v2.tauri.app/reference/javascript/api/namespacewebview/",
+    "https://docs.rs/tauri/latest/tauri/webview/struct.WebviewBuilder.html#method.disable_drag_drop_handler",
+    "https://github.com/tauri-apps/tauri/blob/dev/crates/tauri-runtime/src/webview_permissions.rs",
+    "https://crates.io/crates/fast_image_resize",
+    "https://github.com/ollama/ollama/blob/main/docs/api.md"
+   ],
+   "how_we_use_it": "Existing bug: src/components/composer/Composer.tsx `addImageFile` and src-tauri/src/system.rs `read_image_b64` only check 4 MB per image and allow 10 images, so two 3 MB screenshots already exceed the server's 5 MiB total and the turn fails. Fixes: (1) Add a Rust command `prepare_image(bytes|path)` that decodes, caps the long side (for example at 1568 px), re-encodes to JPEG/WebP and returns bytes. Keep a running total under 5 MiB in the composer and show a size chip. (2) Subscribe to `getCurrentWebview().onDragDropEvent` in Composer: show a drop overlay on enter/over, attach image paths on drop, and turn other paths into @-mentions, matching the current picker. (3) Send bytes with raw invoke instead of a FileReader data URL. (4) Warn when the selected Ollama model lacks the vision capability. The user can drop Godot screenshots or shader output from Explorer and they always go through.",
+   "impact": "high",
+   "effort": "S",
+   "maturity": "production"
+  },
+  {
+   "name": "Desktop-shell plugin set: single-instance, window-state, tray, global-shortcut, autostart, deep-link",
+   "date": "single-instance 2.5.3 (2026-10-10), window-state 2.5.0 (2026-09-30), global-shortcut 2.4.1 (2026-10-10), autostart 2.7.0 (2026-10-01), deep-link 2.6.1 (2026-10-01)",
+   "what": "The official Tauri plugins that turn the window into a desktop tool: one instance, restored geometry, a tray icon with background mode, system-wide hotkeys (including press and release events for push-to-talk), start at login, and `codewhale://` URLs.",
+   "concrete_claims": "\"The Single Instance plugin must be the first one to be registered to work well\" (https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/plugin/single-instance.mdx). Deep links: \"On Linux and Windows deep links are delivered as a command line argument to a new app process\", so use `tauri-plugin-single-instance` with `features = [\"deep-link\"]` (https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/plugin/deep-linking.mdx). Global shortcuts expose `ShortcutState::Pressed` / `Released` in Rust and `register('CommandOrControl+Shift+C', ...)` in JS (https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/plugin/global-shortcut.mdx). Window state: `StateFlags`, `restoreStateCurrent`, `save_window_state` (https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/plugin/window-state.mdx). Tray: `tauri = { features = [\"tray-icon\"] }` and `TrayIconBuilder::new()` (https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/learn/system-tray.mdx). Autostart takes extra launch args such as `Some(vec![\"--flag1\"])` (https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/plugin/autostart.mdx). Versions are on crates.io (https://crates.io/crates/tauri-plugin-single-instance, https://crates.io/crates/tauri-plugin-global-shortcut).",
+   "sources": [
+    "https://v2.tauri.app/plugin/single-instance/",
+    "https://v2.tauri.app/plugin/deep-linking/",
+    "https://v2.tauri.app/plugin/global-shortcut/",
+    "https://v2.tauri.app/plugin/window-state/",
+    "https://v2.tauri.app/learn/system-tray/",
+    "https://v2.tauri.app/plugin/autostart/",
+    "https://crates.io/crates/tauri-plugin-single-instance"
+   ],
+   "how_we_use_it": "src-tauri/Cargo.toml currently has only the opener and dialog plugins and `tauri` with features []. (1) single-instance first in lib.rs. src-tauri/src/runtime.rs starts `codewhale app-server` on a free port, so a second launch would spawn a second sidecar against the same state and possibly a second model load in Ollama VRAM. Instead, focus the existing window and forward argv. (2) window-state, so the 1440x900 window and sidebar size persist. (3) A tray with Show / New thread / Stop all / Quit, where closing the window hides it while turns run. (4) global-shortcut: Ctrl+Alt+Space opens a small quick-ask window, and a hold-to-talk key drives voice input. (5) autostart with `--minimized` to pre-warm the sidecar and Ollama model. (6) A `codewhale://thread/<id>` and `codewhale://new?cwd=...&prompt=...` scheme, so a Godot editor plugin, notification click or browser link can open a thread in the right workspace. Add the matching permissions to src-tauri/capabilities/default.json.",
+   "impact": "high",
+   "effort": "M",
+   "maturity": "production"
+  },
+  {
+   "name": "Windows attention signals: taskbar progress, overlay badge, flash, and toast notifications with action buttons",
+   "date": "tauri 2.12.3 (2026-10-10); tauri-plugin-notification 2.6.0 (2026-10-10); tauri-winrt-notification 0.8.1 (2026-07-17)",
+   "what": "Core Tauri window APIs for taskbar progress, overlay icons and user-attention flashing, plus notifications. The official notification plugin is simple, but its action buttons are mobile-only. Tauri's own WinRT toast crate supports buttons and activation callbacks on Windows.",
+   "concrete_claims": "`Window::set_progress_bar(ProgressBarState)` is supported on Windows. `set_overlay_icon` is \"Windows only\". `set_badge_count` is unsupported on Windows (use the overlay icon). `request_user_attention` exists (https://github.com/tauri-apps/tauri/blob/dev/crates/tauri/src/window/mod.rs). Notification plugin: \"The Actions API is only available on mobile platforms\" (https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/plugin/notification.mdx). tauri-winrt-notification 0.8.1 exposes `Toast::add_button(content, action)`, `on_activated`, `on_dismissed`, `progress` and `set_progress` (crate source, https://crates.io/crates/tauri-winrt-notification, https://github.com/tauri-apps/winrt-notification).",
+   "sources": [
+    "https://docs.rs/tauri/latest/tauri/window/struct.Window.html#method.set_progress_bar",
+    "https://github.com/tauri-apps/tauri/blob/dev/crates/tauri/src/window/mod.rs",
+    "https://v2.tauri.app/plugin/notification/",
+    "https://crates.io/crates/tauri-winrt-notification",
+    "https://github.com/tauri-apps/winrt-notification"
+   ],
+   "how_we_use_it": "While any turn runs, show indeterminate taskbar progress. When the agent waits for approval, set an overlay icon (orange dot) and call `request_user_attention`. When the window is unfocused, show a toast \"Agent wants to run: <command>\" with Approve and Deny buttons through tauri-winrt-notification. `on_activated` routes the button to the existing approval API in api.rs, and a body click focuses the thread (or opens the `codewhale://thread/<id>` deep link). Use the plain notification plugin for 'turn finished' and error toasts. This matters for long local-model runs, where the user leaves the window and comes back.",
+   "impact": "medium",
+   "effort": "S",
+   "maturity": "production"
+  },
+  {
+   "name": "TanStack Virtual end-anchoring (`anchorTo:'end'`, `followOnAppend`) for the chat list",
+   "date": "@tanstack/virtual-core 3.19.4 published 2026-10-13 (the project already resolves 3.19.4)",
+   "what": "New TanStack Virtual options for chat, log and inverted feeds. The virtualizer keeps the viewport pinned to the bottom while the last item grows during streaming, keeps position when older items are prepended, and only auto-follows if the user was already at the end.",
+   "concrete_claims": "\"Set `anchorTo: 'end'` for chat, logs, and reverse/inverted feeds. In end-anchored mode, the virtualizer keeps the current visible item stable when older items are prepended, and keeps an end-pinned viewport pinned when the last item grows during streaming output.\" `followOnAppend?: boolean | 'auto' | 'smooth' | 'instant'` follows \"only if the viewport was already at the end\". Also `scrollEndThreshold` and `isAtEnd()`. It requires stable `getItemKey`: \"Index keys cannot distinguish prepends from appends\" (https://github.com/TanStack/virtual/blob/main/docs/api/virtualizer.md). For comparison, virtua 0.53.5 (about 3 kB gzipped, reverse scroll) is an alternative (https://github.com/inokawa/virtua). @virtuoso.dev/message-list is commercially licensed (npm license field 'Commercial').",
+   "sources": [
+    "https://github.com/TanStack/virtual/blob/main/docs/api/virtualizer.md",
+    "https://tanstack.com/virtual/latest/docs/api/virtualizer",
+    "https://www.npmjs.com/package/@tanstack/virtual-core",
+    "https://github.com/inokawa/virtua"
+   ],
+   "how_we_use_it": "In src/components/chat/MessageList.tsx, replace the manual `atBottom` ref, `scrollToEnd` and `requestAnimationFrame` follow effects, which fight measurement while tokens stream in, with `useVirtualizer({ anchorTo:'end', followOnAppend:'auto', scrollEndThreshold:120, getItemKey: i => items[i].id })`. The current key `${threadId}:${i}` is index-based, so it must become the item id. Use `virtualizer.isAtEnd()` to drive the 'jump to latest' button. Lazy-loading older history (prepend) then keeps the reading position. Scrolling up while the agent is writing stops jumping.",
+   "impact": "medium",
+   "effort": "S",
+   "maturity": "production"
+  }
+ ]
+}

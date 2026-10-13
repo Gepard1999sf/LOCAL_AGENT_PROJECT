@@ -1,0 +1,22 @@
+{
+  "endpoint": "GET /v1/threads/summary (wrong token)",
+  "phase": "offline",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/summary?limit=300",
+    "auth": "wrong-token",
+    "body": null
+  },
+  "status": 401,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "error": {
+        "message": "runtime API bearer token required",
+        "status": 401
+      }
+    }
+  },
+  "elapsed_ms": 1,
+  "recorded_at": "2026-10-13T21:28:37+00:00"
+}

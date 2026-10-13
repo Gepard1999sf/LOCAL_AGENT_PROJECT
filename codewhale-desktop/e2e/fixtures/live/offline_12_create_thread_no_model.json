@@ -1,0 +1,25 @@
+{
+  "endpoint": "POST /v1/threads",
+  "phase": "offline",
+  "request": {
+    "method": "POST",
+    "path": "/v1/threads",
+    "auth": true,
+    "body": {
+      "model_provider": "ollama"
+    }
+  },
+  "status": 400,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "error": {
+        "message": "Local Ollama has no fresh model catalog for this endpoint; select an explicit model or refresh its catalog.",
+        "status": 400
+      }
+    }
+  },
+  "elapsed_ms": 5,
+  "recorded_at": "2026-10-13T21:28:37+00:00",
+  "note": "Client omits `model` when no default model is configured."
+}

@@ -20,6 +20,7 @@ import {
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useApp } from "../../store/app";
 import { basename, fmtBytes, fmtTokens } from "../../lib/format";
+import { effectiveCtx } from "../../lib/models";
 import { IconButton } from "../ui/primitives";
 import type { OllamaModel } from "../../lib/types";
 
@@ -28,11 +29,6 @@ const menuContent =
   "z-50 min-w-[300px] overflow-hidden rounded-[var(--radius-md)] border border-line bg-overlay p-1 text-[13px] shadow-[var(--shadow-lg)]";
 const menuItem =
   "flex cursor-pointer select-none items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 outline-none data-[highlighted]:bg-hover";
-
-export function effectiveCtx(m?: OllamaModel): number | null {
-  if (!m) return null;
-  return m.numCtx ?? null;
-}
 
 export function ModelBadges({ m }: { m: OllamaModel }) {
   const caps = m.capabilities;

@@ -1,0 +1,628 @@
+[
+  {
+    "endpoint": "GET /health",
+    "phase": "synthetic",
+    "request": {
+      "method": "GET",
+      "path": "/health",
+      "auth": true,
+      "body": null
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "status": "ok",
+        "service": "codewhale-runtime-api"
+      }
+    }
+  },
+  {
+    "endpoint": "POST /v1/threads",
+    "phase": "synthetic",
+    "request": {
+      "method": "POST",
+      "path": "/v1/threads",
+      "auth": true,
+      "body": {
+        "model_provider": "ollama",
+        "model": "qwen3-8b-16k",
+        "allowed_tools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "todo_write"
+        ]
+      }
+    },
+    "status": 201,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "schema_version": 2,
+        "id": "thr_0000000000000000000000000000syn1",
+        "created_at": "2026-10-13T09:00:00.000000000Z",
+        "updated_at": "2026-10-13T09:00:00.000000000Z",
+        "model": "qwen3-8b-16k",
+        "model_provider": "ollama",
+        "model_provider_id": "ollama",
+        "allowed_tools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "todo_write"
+        ],
+        "workspace": "C:/Users/dev/projects/demo",
+        "mode": "agent",
+        "permission_posture": "ask",
+        "allow_shell": true,
+        "trust_mode": false,
+        "auto_approve": false,
+        "archived": false
+      }
+    }
+  },
+  {
+    "endpoint": "GET /v1/threads/summary",
+    "phase": "synthetic",
+    "request": {
+      "method": "GET",
+      "path": "/v1/threads/summary?limit=300",
+      "auth": true,
+      "body": null
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": [
+        {
+          "id": "thr_0000000000000000000000000000syn1",
+          "title": "New Thread",
+          "preview": "New Thread",
+          "model": "qwen3-8b-16k",
+          "mode": "agent",
+          "workspace": "C:/Users/dev/projects/demo",
+          "branch": "main",
+          "head": "4f2c1d0",
+          "dirty": false,
+          "archived": false,
+          "updated_at": "2026-10-13T09:00:00.000000000Z",
+          "latest_turn_id": null,
+          "latest_turn_status": null,
+          "pending_attention_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "endpoint": "GET /v1/sessions",
+    "phase": "synthetic",
+    "request": {
+      "method": "GET",
+      "path": "/v1/sessions?limit=50",
+      "auth": true,
+      "body": null
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "sessions": []
+      }
+    }
+  },
+  {
+    "endpoint": "GET /v1/threads/{id}",
+    "phase": "synthetic",
+    "request": {
+      "method": "GET",
+      "path": "/v1/threads/thr_0000000000000000000000000000syn1",
+      "auth": true,
+      "body": null
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "thread": {
+          "schema_version": 2,
+          "id": "thr_0000000000000000000000000000syn1",
+          "created_at": "2026-10-13T09:00:00.000000000Z",
+          "updated_at": "2026-10-13T09:00:00.000000000Z",
+          "model": "qwen3-8b-16k",
+          "model_provider": "ollama",
+          "model_provider_id": "ollama",
+          "allowed_tools": [
+            "read",
+            "write",
+            "edit",
+            "bash",
+            "todo_write"
+          ],
+          "workspace": "C:/Users/dev/projects/demo",
+          "mode": "agent",
+          "permission_posture": "ask",
+          "allow_shell": true,
+          "trust_mode": false,
+          "auto_approve": false,
+          "archived": false
+        },
+        "turns": [],
+        "items": [],
+        "latest_seq": 3,
+        "pending_approvals": [],
+        "pending_user_inputs": [],
+        "pending_dynamic_tool_calls": [],
+        "approval_grants": []
+      }
+    }
+  },
+  {
+    "endpoint": "GET /v1/threads/{id} (unknown id)",
+    "phase": "synthetic",
+    "request": {
+      "method": "GET",
+      "path": "/v1/threads/thr_doesnotexist",
+      "auth": true,
+      "body": null
+    },
+    "status": 404,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "error": {
+          "message": "Thread not found: thr_doesnotexist",
+          "status": 404
+        }
+      }
+    }
+  },
+  {
+    "endpoint": "GET /v1/threads/{id}/context",
+    "phase": "synthetic",
+    "request": {
+      "method": "GET",
+      "path": "/v1/threads/thr_0000000000000000000000000000syn1/context",
+      "auth": true,
+      "body": null
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "thread_id": "thr_0000000000000000000000000000syn1",
+        "model": "qwen3-8b-16k",
+        "provider": "ollama",
+        "model_provider_id": "ollama",
+        "live": true,
+        "window_tokens": 16384,
+        "input_tokens": 3000,
+        "billed_input_tokens": null,
+        "output_cap_tokens": 4096,
+        "input_budget_ceiling": 12288,
+        "available_input_tokens": 9288,
+        "compaction_trigger_tokens": 12288,
+        "usage_percent": 18.3,
+        "pressure": "low"
+      }
+    }
+  },
+  {
+    "endpoint": "PATCH /v1/threads/{id}",
+    "phase": "synthetic",
+    "request": {
+      "method": "PATCH",
+      "path": "/v1/threads/thr_0000000000000000000000000000syn1",
+      "auth": true,
+      "body": {
+        "title": "Тестовая сессия"
+      }
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "schema_version": 2,
+        "id": "thr_0000000000000000000000000000syn1",
+        "created_at": "2026-10-13T09:00:00.000000000Z",
+        "updated_at": "2026-10-13T09:00:00.000000000Z",
+        "model": "qwen3-8b-16k",
+        "model_provider": "ollama",
+        "model_provider_id": "ollama",
+        "allowed_tools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "todo_write"
+        ],
+        "workspace": "C:/Users/dev/projects/demo",
+        "mode": "agent",
+        "permission_posture": "ask",
+        "allow_shell": true,
+        "trust_mode": false,
+        "auto_approve": false,
+        "archived": false,
+        "title": "Тестовая сессия"
+      }
+    }
+  },
+  {
+    "endpoint": "POST /v1/threads/{id}/fork",
+    "phase": "synthetic",
+    "request": {
+      "method": "POST",
+      "path": "/v1/threads/thr_0000000000000000000000000000syn1/fork",
+      "auth": true,
+      "body": {}
+    },
+    "status": 201,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "schema_version": 2,
+        "id": "thr_fork",
+        "created_at": "2026-10-13T09:00:00.000000000Z",
+        "updated_at": "2026-10-13T09:00:00.000000000Z",
+        "model": "qwen3-8b-16k",
+        "model_provider": "ollama",
+        "model_provider_id": "ollama",
+        "allowed_tools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "todo_write"
+        ],
+        "workspace": "C:/Users/dev/projects/demo",
+        "mode": "agent",
+        "permission_posture": "ask",
+        "allow_shell": true,
+        "trust_mode": false,
+        "auto_approve": false,
+        "archived": false
+      }
+    }
+  },
+  {
+    "endpoint": "POST /v1/threads/{id}/compact",
+    "phase": "synthetic",
+    "request": {
+      "method": "POST",
+      "path": "/v1/threads/thr_0000000000000000000000000000syn1/compact",
+      "auth": true,
+      "body": {}
+    },
+    "status": 202,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "thread": {
+          "schema_version": 2,
+          "id": "thr_0000000000000000000000000000syn1",
+          "created_at": "2026-10-13T09:00:00.000000000Z",
+          "updated_at": "2026-10-13T09:00:00.000000000Z",
+          "model": "qwen3-8b-16k",
+          "model_provider": "ollama",
+          "model_provider_id": "ollama",
+          "allowed_tools": [
+            "read",
+            "write",
+            "edit",
+            "bash",
+            "todo_write"
+          ],
+          "workspace": "C:/Users/dev/projects/demo",
+          "mode": "agent",
+          "permission_posture": "ask",
+          "allow_shell": true,
+          "trust_mode": false,
+          "auto_approve": false,
+          "archived": false
+        },
+        "turn": {
+          "schema_version": 2,
+          "id": "turn_000000000000000000000000000syn1",
+          "thread_id": "thr_0000000000000000000000000000syn1",
+          "status": "in_progress",
+          "input_summary": "Manual context compaction",
+          "created_at": "2026-10-13T09:00:00.000000000Z",
+          "started_at": "2026-10-13T09:00:00.000000000Z",
+          "routing_settlement": false,
+          "permission_posture": "ask",
+          "mode": "agent",
+          "effective_provider": "ollama",
+          "effective_provider_id": "ollama",
+          "effective_model": "qwen3-8b-16k",
+          "item_ids": [],
+          "steer_count": 0
+        }
+      }
+    }
+  },
+  {
+    "endpoint": "POST /v1/threads/{id}/turns",
+    "phase": "synthetic",
+    "request": {
+      "method": "POST",
+      "path": "/v1/threads/thr_0000000000000000000000000000syn1/turns",
+      "auth": true,
+      "body": {
+        "prompt": "Привет",
+        "operation_key": "desk-0-syn",
+        "allowed_tools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "todo_write"
+        ]
+      }
+    },
+    "status": 201,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "thread": {
+          "schema_version": 2,
+          "id": "thr_0000000000000000000000000000syn1",
+          "created_at": "2026-10-13T09:00:00.000000000Z",
+          "updated_at": "2026-10-13T09:00:00.000000000Z",
+          "model": "qwen3-8b-16k",
+          "model_provider": "ollama",
+          "model_provider_id": "ollama",
+          "allowed_tools": [
+            "read",
+            "write",
+            "edit",
+            "bash",
+            "todo_write"
+          ],
+          "workspace": "C:/Users/dev/projects/demo",
+          "mode": "agent",
+          "permission_posture": "ask",
+          "allow_shell": true,
+          "trust_mode": false,
+          "auto_approve": false,
+          "archived": false
+        },
+        "turn": {
+          "schema_version": 2,
+          "id": "turn_000000000000000000000000000syn1",
+          "thread_id": "thr_0000000000000000000000000000syn1",
+          "status": "in_progress",
+          "input_summary": "Привет",
+          "created_at": "2026-10-13T09:00:00.000000000Z",
+          "started_at": "2026-10-13T09:00:00.000000000Z",
+          "routing_settlement": false,
+          "permission_posture": "ask",
+          "mode": "agent",
+          "effective_provider": "ollama",
+          "effective_provider_id": "ollama",
+          "effective_model": "qwen3-8b-16k",
+          "item_ids": [],
+          "steer_count": 0
+        }
+      }
+    }
+  },
+  {
+    "endpoint": "POST /v1/threads/{id}/turns/{turn_id}/interrupt",
+    "phase": "synthetic",
+    "request": {
+      "method": "POST",
+      "path": "/v1/threads/thr_0000000000000000000000000000syn1/turns/turn_000000000000000000000000000syn1/interrupt",
+      "auth": true,
+      "body": {}
+    },
+    "status": 202,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "ok": true,
+        "thread_id": "thr_0000000000000000000000000000syn1",
+        "turn_id": "turn_000000000000000000000000000syn1"
+      }
+    }
+  },
+  {
+    "endpoint": "POST /v1/threads/{id}/turns/{turn_id}/interrupt (already finished)",
+    "phase": "synthetic",
+    "request": {
+      "method": "POST",
+      "path": "/v1/threads/thr_0000000000000000000000000000syn1/turns/turn_000000000000000000000000000syn1/interrupt",
+      "auth": true,
+      "body": {}
+    },
+    "status": 409,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "error": {
+          "message": "No active turn on thread thr_0000000000000000000000000000syn1",
+          "status": 409
+        }
+      }
+    }
+  },
+  {
+    "endpoint": "GET /v1/approvals",
+    "phase": "synthetic",
+    "request": {
+      "method": "GET",
+      "path": "/v1/approvals",
+      "auth": true,
+      "body": null
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": []
+    }
+  },
+  {
+    "endpoint": "POST /v1/approvals/{approval_id}",
+    "phase": "synthetic",
+    "request": {
+      "method": "POST",
+      "path": "/v1/approvals/appr_1",
+      "auth": true,
+      "body": {
+        "decision": "allow",
+        "remember": false
+      }
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "ok": true,
+        "approval_id": "appr_1",
+        "decision": "allow",
+        "delivered": true
+      }
+    }
+  },
+  {
+    "endpoint": "POST /v1/approvals/{approval_id} (unknown id)",
+    "phase": "synthetic",
+    "request": {
+      "method": "POST",
+      "path": "/v1/approvals/appr_doesnotexist",
+      "auth": true,
+      "body": {
+        "decision": "allow",
+        "remember": false
+      }
+    },
+    "status": 404,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "error": {
+          "message": "no pending approval with id 'appr_doesnotexist'",
+          "status": 404
+        }
+      }
+    }
+  },
+  {
+    "endpoint": "POST /v1/user-input/{thread_id}/{input_id}",
+    "phase": "synthetic",
+    "request": {
+      "method": "POST",
+      "path": "/v1/user-input/thr_0000000000000000000000000000syn1/inp_1",
+      "auth": true,
+      "body": {
+        "answers": []
+      }
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "ok": true,
+        "input_id": "inp_1",
+        "delivered": true
+      }
+    }
+  },
+  {
+    "endpoint": "GET /v1/workspace/files/search",
+    "phase": "synthetic",
+    "request": {
+      "method": "GET",
+      "path": "/v1/workspace/files/search?query=.&limit=60",
+      "auth": true,
+      "body": null
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "paths": [
+          "Cargo.toml",
+          "README.md",
+          "src/",
+          "src/lib.rs",
+          "src/main.rs",
+          "tests/smoke.rs"
+        ]
+      }
+    }
+  },
+  {
+    "endpoint": "GET /v1/usage",
+    "phase": "synthetic",
+    "request": {
+      "method": "GET",
+      "path": "/v1/usage?group_by=day",
+      "auth": true,
+      "body": null
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "since": null,
+        "until": null,
+        "group_by": "day",
+        "totals": {
+          "input_tokens": 4210,
+          "output_tokens": 812,
+          "cached_tokens": 0,
+          "reasoning_tokens": 0,
+          "reasoning_replay_tokens": 0,
+          "cache_write_tokens": 0,
+          "cost_usd": 0.0,
+          "cost_cny": 0.0,
+          "priced_turns": 0,
+          "unpriced_turns": 3,
+          "nonmetered_turns": 3,
+          "cost_complete": false,
+          "turns": 3
+        },
+        "buckets": [
+          {
+            "key": "2026-10-13",
+            "input_tokens": 4210,
+            "output_tokens": 812,
+            "cached_tokens": 0,
+            "reasoning_tokens": 0,
+            "reasoning_replay_tokens": 0,
+            "cache_write_tokens": 0,
+            "cost_usd": 0.0,
+            "cost_cny": 0.0,
+            "priced_turns": 0,
+            "unpriced_turns": 3,
+            "nonmetered_turns": 3,
+            "cost_complete": false,
+            "turns": 3
+          }
+        ]
+      }
+    }
+  },
+  {
+    "endpoint": "POST /v1/sessions/{id}/resume-thread",
+    "phase": "synthetic",
+    "request": {
+      "method": "POST",
+      "path": "/v1/sessions/sess_1/resume-thread",
+      "auth": true,
+      "body": {}
+    },
+    "status": 200,
+    "response": {
+      "content_type": "application/json",
+      "body": {
+        "thread_id": "thr_0000000000000000000000000000syn1",
+        "session_id": "sess_1",
+        "message_count": 0,
+        "summary": "Session resumed"
+      }
+    }
+  }
+]

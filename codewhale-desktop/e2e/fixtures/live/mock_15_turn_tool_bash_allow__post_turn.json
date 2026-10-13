@@ -1,0 +1,71 @@
+{
+  "endpoint": "POST /v1/threads/{id}/turns",
+  "phase": "extra",
+  "request": {
+    "method": "POST",
+    "path": "/v1/threads/thr_be79ced7fcd149afbeccd703125157ef/turns",
+    "auth": true,
+    "body": {
+      "prompt": "Выполни команду [tool:bash]",
+      "operation_key": "desk-1791927106128-rec",
+      "allowed_tools": [
+        "read",
+        "write",
+        "edit",
+        "bash",
+        "todo_write"
+      ]
+    }
+  },
+  "status": 201,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "thread": {
+        "schema_version": 2,
+        "id": "thr_be79ced7fcd149afbeccd703125157ef",
+        "created_at": "2026-10-13T21:31:45.797713071Z",
+        "updated_at": "2026-10-13T21:31:46.319266236Z",
+        "model": "qwen3:4b",
+        "model_provider": "ollama",
+        "model_provider_id": "ollama",
+        "allowed_tools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "todo_write"
+        ],
+        "workspace": "/work/demo-project",
+        "mode": "agent",
+        "permission_posture": "ask",
+        "allow_shell": true,
+        "trust_mode": false,
+        "auto_approve": false,
+        "latest_turn_id": "turn_93d22273e327483fbe13e8dcc4f8ef5e",
+        "archived": false
+      },
+      "turn": {
+        "schema_version": 2,
+        "id": "turn_93d22273e327483fbe13e8dcc4f8ef5e",
+        "thread_id": "thr_be79ced7fcd149afbeccd703125157ef",
+        "status": "in_progress",
+        "input_summary": "Выполни команду [tool:bash]",
+        "created_at": "2026-10-13T21:31:46.319266236Z",
+        "started_at": "2026-10-13T21:31:46.319266236Z",
+        "routing_settlement": false,
+        "permission_posture": "ask",
+        "mode": "agent",
+        "effective_provider": "ollama",
+        "effective_provider_id": "ollama",
+        "effective_model": "qwen3:4b",
+        "item_ids": [
+          "item_421c74b86a8b4ccd907d4ccb30468f4e"
+        ],
+        "steer_count": 0
+      }
+    }
+  },
+  "elapsed_ms": 249,
+  "recorded_at": "2026-10-13T21:31:46+00:00"
+}

@@ -7,6 +7,7 @@ import { useApp } from "../../store/app";
 import { api } from "../../lib/tauri";
 import { APPROVABLE_TOOLS, LITE_TOOLS } from "../../lib/tools";
 import { Button, Dot, IconButton, SectionTitle, Toggle } from "../ui/primitives";
+import { effectiveCtx } from "../../lib/models";
 
 const RISK_HINT: Record<string, string> = {
   safe: "безопасно",
@@ -40,10 +41,12 @@ export function SettingsPanel() {
   const summaries = useApp((s) => s.summaries);
   const archiveThread = useApp((s) => s.archiveThread);
   const [url, setUrl] = useState(settings?.ollamaUrl ?? "");
+  const [cwPath, setCwPath] = useState(settings?.codewhalePath ?? "");
   const [checking, setChecking] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => setUrl(settings?.ollamaUrl ?? ""), [settings?.ollamaUrl]);
+  useEffect(() => setCwPath(settings?.codewhalePath ?? ""), [settings?.codewhalePath]);
   if (!settings) return null;
 
   const restartRuntime = async () => {
@@ -53,6 +56,12 @@ export function SettingsPanel() {
     } catch (e) {
       toast.error("Не удалось перезапустить", { description: String(e) });
     }
+  };
+
+  // The path is saved once editing is done (blur / Enter), not on every keystroke.
+  const commitCwPath = () => {
+    const next = cwPath.trim() || null;
+    if (next !== (settings.codewhalePath ?? null)) update({ codewhalePath: next });
   };
 
   const exportAll = async () => {
@@ -96,13 +105,16 @@ export function SettingsPanel() {
             </option>
             {models
               .filter((m) => !m.embedding)
-              .map((m) => (
-                <option key={m.name} value={m.name}>
-                  {m.name}
-                  {m.numCtx ? ` · ${Math.round(m.numCtx / 1024)}k` : " · 4k"}
-                  {m.capabilities.includes("tools") ? "" : " · без инструментов"}
-                </option>
-              ))}
+              .map((m) => {
+                const ctx = effectiveCtx(m);
+                return (
+                  <option key={m.name} value={m.name}>
+                    {m.name}
+                    {ctx ? ` · ${Math.round(ctx / 1024)}k` : " · 4k"}
+                    {m.capabilities.includes("tools") ? "" : " · без инструментов"}
+                  </option>
+                );
+              })}
           </select>
         </Field>
         <div className="flex items-center gap-2 py-1.5">
@@ -130,9 +142,15 @@ export function SettingsPanel() {
           <div className="flex gap-1">
             <input
               className={inputCls}
-              value={settings.codewhalePath ?? ""}
+              value={cwPath}
               placeholder="авто"
-              onChange={(e) => update({ codewhalePath: e.target.value || null })}
+              onChange={(e) => setCwPath(e.target.value)}
+              onBlur={commitCwPath}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                // Esc closes the panel without a blur event: save first.
+                else if (e.key === "Escape") commitCwPath();
+              }}
             />
             <IconButton
               label="Выбрать файл"
@@ -158,7 +176,7 @@ export function SettingsPanel() {
               >
                 <span className="block font-medium text-fg">{p === "lite" ? "Облегчённый" : "Полный"}</span>
                 <span className="block text-[11px] text-fg3">
-                  {p === "lite" ? `${LITE_TOOLS.length} инструмента, промпт ≈4.5k токенов` : "13 инструментов, промпт ≈10k токенов"}
+                  {p === "lite" ? `Только ${LITE_TOOLS.join(", ")}` : "Все инструменты CodeWhale, промпт длиннее"}
                 </span>
               </button>
             ))}
@@ -268,8 +286,11 @@ export function SettingsPanel() {
           )}
           <Button
             onClick={async () => {
-              const home = await api.codewhaleHome();
-              revealItemInDir(home).catch((e) => toast.error(String(e)));
+              try {
+                await revealItemInDir(await api.codewhaleHome());
+              } catch (e) {
+                toast.error("Не удалось открыть папку", { description: String(e) });
+              }
             }}
           >
             <FolderOpen size={13} /> Открыть ~/.codewhale/

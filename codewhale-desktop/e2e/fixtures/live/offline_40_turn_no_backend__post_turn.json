@@ -1,0 +1,65 @@
+{
+  "endpoint": "POST /v1/threads/{id}/turns",
+  "phase": "offline",
+  "request": {
+    "method": "POST",
+    "path": "/v1/threads/thr_66897057f8ab4643be149a7d962d9407/turns",
+    "auth": true,
+    "body": {
+      "prompt": "Привет! Ответь одним словом.",
+      "operation_key": "desk-1791926918359-rec",
+      "allowed_tools": [
+        "read",
+        "write",
+        "edit",
+        "bash",
+        "todo_write"
+      ]
+    }
+  },
+  "status": 201,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "thread": {
+        "schema_version": 2,
+        "id": "thr_66897057f8ab4643be149a7d962d9407",
+        "created_at": "2026-10-13T21:28:37.459933603Z",
+        "updated_at": "2026-10-13T21:28:38.416434123Z",
+        "model": "qwen3:0.6b",
+        "model_provider": "ollama",
+        "model_provider_id": "ollama",
+        "workspace": "/work/demo-project",
+        "mode": "agent",
+        "permission_posture": "ask",
+        "allow_shell": true,
+        "trust_mode": false,
+        "auto_approve": false,
+        "latest_turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+        "archived": false,
+        "title": "Тестовая сессия"
+      },
+      "turn": {
+        "schema_version": 2,
+        "id": "turn_ae181c05393b4490b03a7ea19196154f",
+        "thread_id": "thr_66897057f8ab4643be149a7d962d9407",
+        "status": "in_progress",
+        "input_summary": "Привет! Ответь одним словом.",
+        "created_at": "2026-10-13T21:28:38.416434123Z",
+        "started_at": "2026-10-13T21:28:38.416434123Z",
+        "routing_settlement": false,
+        "permission_posture": "ask",
+        "mode": "agent",
+        "effective_provider": "ollama",
+        "effective_provider_id": "ollama",
+        "effective_model": "qwen3:0.6b",
+        "item_ids": [
+          "item_013992c8119847caaa38560d6777dda0"
+        ],
+        "steer_count": 0
+      }
+    }
+  },
+  "elapsed_ms": 132,
+  "recorded_at": "2026-10-13T21:28:38+00:00"
+}

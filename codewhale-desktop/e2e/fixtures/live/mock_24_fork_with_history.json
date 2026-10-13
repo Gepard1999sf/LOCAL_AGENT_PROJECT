@@ -1,0 +1,46 @@
+{
+  "endpoint": "POST /v1/threads/{id}/fork",
+  "phase": "mock",
+  "request": {
+    "method": "POST",
+    "path": "/v1/threads/thr_0a36e0abf43743d9946e29654d7d448e/fork",
+    "auth": true,
+    "body": {}
+  },
+  "status": 201,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "schema_version": 2,
+      "id": "thr_2441b919366541e0b04a3f52df56fbaf",
+      "created_at": "2026-10-13T21:30:24.248136905Z",
+      "updated_at": "2026-10-13T21:30:24.248136905Z",
+      "model": "qwen3:4b",
+      "model_provider": "ollama",
+      "model_provider_id": "ollama",
+      "allowed_tools": [
+        "read",
+        "write",
+        "edit",
+        "bash",
+        "todo_write"
+      ],
+      "workspace": "/work/demo-project",
+      "mode": "agent",
+      "permission_posture": "ask",
+      "allow_shell": true,
+      "trust_mode": false,
+      "auto_approve": false,
+      "latest_turn_id": "turn_10d1d1cd09f54f7d848c91b0ec2d1e52",
+      "archived": false,
+      "session_id": "4ad5ac9c-5c81-475a-b90f-d05c81b7b330",
+      "saved_session_checkpoint": {
+        "covered_turn_id": "turn_10d1d1cd09f54f7d848c91b0ec2d1e52",
+        "messages_sha256": "206f1f84a6cd47f0014e6757e585014c9abbac934af0a1e73162025616a1bcff",
+        "messages_len": 16
+      }
+    }
+  },
+  "elapsed_ms": 122,
+  "recorded_at": "2026-10-13T21:30:24+00:00"
+}

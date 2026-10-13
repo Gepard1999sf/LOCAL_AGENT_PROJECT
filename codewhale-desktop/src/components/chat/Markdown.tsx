@@ -2,17 +2,12 @@ import { memo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { toast } from "sonner";
 import { CodeBlock } from "./CodeBlock";
 import { api } from "../../lib/tauri";
-import { useApp } from "../../store/app";
+import { resolvePath } from "../../lib/paths";
 
 const FILE_REF = /^([A-Za-z]:[\\/])?[\w.\-\\/]+\.[A-Za-z0-9]{1,8}(:\d+)?$/;
-
-function resolvePath(rel: string): string {
-  const ws = useApp.getState().settings?.workspace ?? "";
-  if (/^[A-Za-z]:[\\/]/.test(rel) || !ws) return rel;
-  return `${ws.replace(/[\\/]+$/, "")}\\${rel.replace(/\//g, "\\")}`;
-}
 
 function InlineCode({ children }: { children?: ReactNode }) {
   const text = String(children ?? "");
@@ -23,7 +18,11 @@ function InlineCode({ children }: { children?: ReactNode }) {
       <code
         className="cursor-pointer text-bluefg hover:underline"
         title="Открыть в редакторе"
-        onClick={() => api.openInEditor(resolvePath(path), line ? Number(line) : undefined).catch(() => {})}
+        onClick={() =>
+          api
+            .openInEditor(resolvePath(path), line ? Number(line) : undefined)
+            .catch((e) => toast.error("Не удалось открыть файл", { description: String(e) }))
+        }
       >
         {text}
       </code>
@@ -52,7 +51,9 @@ function makeComponents(streaming: boolean): Components {
           href={href}
           onClick={(e) => {
             e.preventDefault();
-            if (href && /^https?:\/\//.test(href)) openUrl(href).catch(() => {});
+            if (href && /^(https?:\/\/|mailto:)/i.test(href)) {
+              openUrl(href).catch((err) => toast.error("Не удалось открыть ссылку", { description: String(err) }));
+            }
           }}
         >
           {children}

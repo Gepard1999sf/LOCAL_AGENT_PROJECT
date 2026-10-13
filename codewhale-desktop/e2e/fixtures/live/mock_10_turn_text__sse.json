@@ -1,0 +1,649 @@
+{
+  "endpoint": "GET /v1/threads/{id}/events",
+  "phase": "mock",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_0a36e0abf43743d9946e29654d7d448e/events?replay_limit=4096&progress=true&since_seq=0",
+    "auth": true
+  },
+  "status": 200,
+  "response_headers": {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    "x-codewhale-stream-end": "1"
+  },
+  "events": [
+    {
+      "event": "stream.progress",
+      "id": null,
+      "data": {
+        "schema_version": 1,
+        "event": "stream.progress",
+        "kind": "stream.progress",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "seq": 0,
+        "state": "replaying"
+      }
+    },
+    {
+      "event": "thread.started",
+      "id": "46",
+      "data": {
+        "schema_version": 1,
+        "seq": 46,
+        "event": "thread.started",
+        "kind": "thread.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": null,
+        "item_id": null,
+        "timestamp": "2026-10-13T21:29:50.099112924+00:00",
+        "created_at": "2026-10-13T21:29:50.099112924+00:00",
+        "payload": {
+          "thread": {
+            "schema_version": 2,
+            "id": "thr_0a36e0abf43743d9946e29654d7d448e",
+            "created_at": "2026-10-13T21:29:50.075705243Z",
+            "updated_at": "2026-10-13T21:29:50.075705243Z",
+            "model": "qwen3:4b",
+            "model_provider": "ollama",
+            "model_provider_id": "ollama",
+            "allowed_tools": [
+              "read",
+              "write",
+              "edit",
+              "bash",
+              "todo_write"
+            ],
+            "workspace": "/work/demo-project",
+            "mode": "agent",
+            "permission_posture": "ask",
+            "allow_shell": true,
+            "trust_mode": false,
+            "auto_approve": false,
+            "archived": false
+          }
+        },
+        "previous_seq": 0
+      }
+    },
+    {
+      "event": "stream.progress",
+      "id": null,
+      "data": {
+        "schema_version": 1,
+        "event": "stream.progress",
+        "kind": "stream.progress",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "seq": 46,
+        "state": "live"
+      }
+    },
+    {
+      "event": "turn.started",
+      "id": "47",
+      "data": {
+        "schema_version": 1,
+        "seq": 47,
+        "event": "turn.started",
+        "kind": "turn.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:29:50.679082203+00:00",
+        "created_at": "2026-10-13T21:29:50.679082203+00:00",
+        "payload": {
+          "turn": {
+            "schema_version": 2,
+            "id": "turn_04efa11653644339b9ee9208f73f12c2",
+            "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+            "status": "in_progress",
+            "input_summary": "Привет! Ответь одним словом.",
+            "created_at": "2026-10-13T21:29:50.627443488Z",
+            "started_at": "2026-10-13T21:29:50.627443488Z",
+            "routing_settlement": false,
+            "permission_posture": "ask",
+            "mode": "agent",
+            "effective_provider": "ollama",
+            "effective_provider_id": "ollama",
+            "effective_model": "qwen3:4b",
+            "item_ids": [
+              "item_6ea9968c904941ef8b2cbe5c74153f99"
+            ],
+            "steer_count": 0
+          }
+        },
+        "previous_seq": 46
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "48",
+      "data": {
+        "schema_version": 1,
+        "seq": 48,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": "item_6ea9968c904941ef8b2cbe5c74153f99",
+        "timestamp": "2026-10-13T21:29:50.687420682+00:00",
+        "created_at": "2026-10-13T21:29:50.687420682+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_6ea9968c904941ef8b2cbe5c74153f99",
+            "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+            "kind": "user_message",
+            "status": "completed",
+            "summary": "Привет! Ответь одним словом.",
+            "detail": "Привет! Ответь одним словом.",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:29:50.627443488Z",
+            "ended_at": "2026-10-13T21:29:50.627443488Z"
+          }
+        },
+        "previous_seq": 47
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "49",
+      "data": {
+        "schema_version": 1,
+        "seq": 49,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": "item_6ea9968c904941ef8b2cbe5c74153f99",
+        "timestamp": "2026-10-13T21:29:50.699629388+00:00",
+        "created_at": "2026-10-13T21:29:50.699629388+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_6ea9968c904941ef8b2cbe5c74153f99",
+            "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+            "kind": "user_message",
+            "status": "completed",
+            "summary": "Привет! Ответь одним словом.",
+            "detail": "Привет! Ответь одним словом.",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:29:50.627443488Z",
+            "ended_at": "2026-10-13T21:29:50.627443488Z"
+          }
+        },
+        "previous_seq": 48
+      }
+    },
+    {
+      "event": "turn.lifecycle",
+      "id": "50",
+      "data": {
+        "schema_version": 1,
+        "seq": 50,
+        "event": "turn.lifecycle",
+        "kind": "turn.lifecycle",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:29:50.713294093+00:00",
+        "created_at": "2026-10-13T21:29:50.713294093+00:00",
+        "payload": {
+          "status": "in_progress"
+        },
+        "previous_seq": 49
+      }
+    },
+    {
+      "event": "turn.workspace_snapshot",
+      "id": "51",
+      "data": {
+        "schema_version": 1,
+        "seq": 51,
+        "event": "turn.workspace_snapshot",
+        "kind": "turn.workspace_snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:29:50.783087757+00:00",
+        "created_at": "2026-10-13T21:29:50.783087757+00:00",
+        "payload": {
+          "kind": "pre_turn",
+          "snapshot_id": "c4ab8bc5cb75bee0140c7c4622ed7b4d8e6da8b1",
+          "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+          "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+        },
+        "previous_seq": 50
+      }
+    },
+    {
+      "event": "model.tools.snapshot",
+      "id": "52",
+      "data": {
+        "schema_version": 1,
+        "seq": 52,
+        "event": "model.tools.snapshot",
+        "kind": "model.tools.snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:29:50.815091789+00:00",
+        "created_at": "2026-10-13T21:29:50.815091789+00:00",
+        "payload": {
+          "_shortened_by_recorder": true,
+          "payload_keys": [
+            "projection_redacted",
+            "snapshot"
+          ],
+          "tool_names": []
+        },
+        "previous_seq": 51
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "53",
+      "data": {
+        "schema_version": 1,
+        "seq": 53,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": "item_4f8c90241ac84faf888b973fa0cf2e95",
+        "timestamp": "2026-10-13T21:29:50.859065322+00:00",
+        "created_at": "2026-10-13T21:29:50.859065322+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_4f8c90241ac84faf888b973fa0cf2e95",
+            "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+            "kind": "agent_reasoning",
+            "status": "in_progress",
+            "summary": "",
+            "detail": "",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:29:50.831197072Z"
+          }
+        },
+        "previous_seq": 52
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "54",
+      "data": {
+        "schema_version": 1,
+        "seq": 54,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": "item_4f8c90241ac84faf888b973fa0cf2e95",
+        "timestamp": "2026-10-13T21:29:50.911080316+00:00",
+        "created_at": "2026-10-13T21:29:50.911080316+00:00",
+        "payload": {
+          "delta": "Пользователь поздоровался, отвечаю кратко. ",
+          "kind": "agent_reasoning"
+        },
+        "previous_seq": 53
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "55",
+      "data": {
+        "schema_version": 1,
+        "seq": 55,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": "item_4f8c90241ac84faf888b973fa0cf2e95",
+        "timestamp": "2026-10-13T21:29:50.935087951+00:00",
+        "created_at": "2026-10-13T21:29:50.935087951+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_4f8c90241ac84faf888b973fa0cf2e95",
+            "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+            "kind": "agent_reasoning",
+            "status": "completed",
+            "summary": "Пользователь поздоровался, отвечаю кратко. ",
+            "detail": "Пользователь поздоровался, отвечаю кратко. ",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:29:50.831197072Z",
+            "ended_at": "2026-10-13T21:29:50.916599338Z"
+          }
+        },
+        "previous_seq": 54
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "56",
+      "data": {
+        "schema_version": 1,
+        "seq": 56,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": "item_5db17f408c5a4f0b89e4808a8c3b05b1",
+        "timestamp": "2026-10-13T21:29:50.959063965+00:00",
+        "created_at": "2026-10-13T21:29:50.959063965+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_5db17f408c5a4f0b89e4808a8c3b05b1",
+            "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+            "kind": "agent_message",
+            "status": "in_progress",
+            "summary": "",
+            "detail": "",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:29:50.939368912Z"
+          }
+        },
+        "previous_seq": 55
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "57",
+      "data": {
+        "schema_version": 1,
+        "seq": 57,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": "item_5db17f408c5a4f0b89e4808a8c3b05b1",
+        "timestamp": "2026-10-13T21:29:51.017850663+00:00",
+        "created_at": "2026-10-13T21:29:51.017850663+00:00",
+        "payload": {
+          "delta": "Привет! Это ответ тестовой ",
+          "kind": "agent_message"
+        },
+        "previous_seq": 56
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "58",
+      "data": {
+        "schema_version": 1,
+        "seq": 58,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": "item_5db17f408c5a4f0b89e4808a8c3b05b1",
+        "timestamp": "2026-10-13T21:29:51.074644333+00:00",
+        "created_at": "2026-10-13T21:29:51.074644333+00:00",
+        "payload": {
+          "delta": "модели (mock ",
+          "kind": "agent_message"
+        },
+        "previous_seq": 57
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "59",
+      "data": {
+        "schema_version": 1,
+        "seq": 59,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": "item_5db17f408c5a4f0b89e4808a8c3b05b1",
+        "timestamp": "2026-10-13T21:29:51.123429895+00:00",
+        "created_at": "2026-10-13T21:29:51.123429895+00:00",
+        "payload": {
+          "delta": "Ollama). ",
+          "kind": "agent_message"
+        },
+        "previous_seq": 58
+      }
+    },
+    {
+      "event": "turn.usage",
+      "id": "60",
+      "data": {
+        "schema_version": 1,
+        "seq": 60,
+        "event": "turn.usage",
+        "kind": "turn.usage",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:29:51.131477846+00:00",
+        "created_at": "2026-10-13T21:29:51.131477846+00:00",
+        "payload": {
+          "usage": {
+            "input_tokens": 1200,
+            "output_tokens": 42
+          },
+          "duration_ms": 332,
+          "first_token_ms": 4,
+          "request_ms": 337,
+          "maxOutputTokens": null
+        },
+        "previous_seq": 59
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "61",
+      "data": {
+        "schema_version": 1,
+        "seq": 61,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": "item_5db17f408c5a4f0b89e4808a8c3b05b1",
+        "timestamp": "2026-10-13T21:29:51.143075966+00:00",
+        "created_at": "2026-10-13T21:29:51.143075966+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_5db17f408c5a4f0b89e4808a8c3b05b1",
+            "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+            "kind": "agent_message",
+            "status": "completed",
+            "summary": "Привет! Это ответ тестовой модели (mock Ollama). ",
+            "detail": "Привет! Это ответ тестовой модели (mock Ollama). ",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:29:50.939368912Z",
+            "ended_at": "2026-10-13T21:29:51.133107429Z"
+          }
+        },
+        "previous_seq": 60
+      }
+    },
+    {
+      "event": "model.tools.snapshot",
+      "id": "62",
+      "data": {
+        "schema_version": 1,
+        "seq": 62,
+        "event": "model.tools.snapshot",
+        "kind": "model.tools.snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:29:51.171070044+00:00",
+        "created_at": "2026-10-13T21:29:51.171070044+00:00",
+        "payload": {
+          "_shortened_by_recorder": true,
+          "payload_keys": [
+            "projection_redacted",
+            "snapshot"
+          ],
+          "tool_names": []
+        },
+        "previous_seq": 61
+      }
+    },
+    {
+      "event": "turn.workspace_snapshot",
+      "id": "63",
+      "data": {
+        "schema_version": 1,
+        "seq": 63,
+        "event": "turn.workspace_snapshot",
+        "kind": "turn.workspace_snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:29:51.199067580+00:00",
+        "created_at": "2026-10-13T21:29:51.199067580+00:00",
+        "payload": {
+          "kind": "post_turn",
+          "snapshot_id": "22a61318f2a78f80be1b9df2e5cca6af432f1708",
+          "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+          "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+          "changed_paths": []
+        },
+        "previous_seq": 62
+      }
+    },
+    {
+      "event": "turn.completed",
+      "id": "64",
+      "data": {
+        "schema_version": 1,
+        "seq": 64,
+        "event": "turn.completed",
+        "kind": "turn.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:29:51.231080131+00:00",
+        "created_at": "2026-10-13T21:29:51.231080131+00:00",
+        "payload": {
+          "turn": {
+            "schema_version": 2,
+            "id": "turn_04efa11653644339b9ee9208f73f12c2",
+            "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+            "status": "completed",
+            "input_summary": "Привет! Ответь одним словом.",
+            "created_at": "2026-10-13T21:29:50.627443488Z",
+            "started_at": "2026-10-13T21:29:50.669413730Z",
+            "ended_at": "2026-10-13T21:29:51.203703893Z",
+            "duration_ms": 534,
+            "usage": {
+              "input_tokens": 1200,
+              "output_tokens": 42
+            },
+            "routing_settlement": false,
+            "effective_route_usage": {
+              "input_tokens": 1200,
+              "output_tokens": 42
+            },
+            "permission_posture": "ask",
+            "mode": "agent",
+            "effective_provider": "ollama",
+            "effective_provider_id": "ollama",
+            "effective_billing_surface": "local-no-bill",
+            "effective_endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+            "effective_billing_mode": "local",
+            "effective_dispatched_at": "2026-10-13T21:29:50.772116512Z",
+            "effective_model": "qwen3:4b",
+            "modelRequestDiagnostics": {
+              "modelRequestsStarted": 1,
+              "transportRetries": 0,
+              "transparentStreamRetries": 0,
+              "streamResumes": 0,
+              "reasoningOnlyReprompts": 0,
+              "emptyStopRetries": 0
+            },
+            "item_ids": [
+              "item_6ea9968c904941ef8b2cbe5c74153f99",
+              "item_4f8c90241ac84faf888b973fa0cf2e95",
+              "item_5db17f408c5a4f0b89e4808a8c3b05b1"
+            ],
+            "steer_count": 0,
+            "workspace": {
+              "state": "pending",
+              "pre_turn_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+              "truncated": false,
+              "omitted": 0
+            },
+            "workspace_snapshots": [
+              {
+                "kind": "pre_turn",
+                "snapshot_id": "c4ab8bc5cb75bee0140c7c4622ed7b4d8e6da8b1",
+                "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+                "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+              },
+              {
+                "kind": "post_turn",
+                "snapshot_id": "22a61318f2a78f80be1b9df2e5cca6af432f1708",
+                "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+                "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+                "changed_paths": []
+              }
+            ]
+          }
+        },
+        "previous_seq": 63
+      }
+    },
+    {
+      "event": "turn.artifacts",
+      "id": "65",
+      "data": {
+        "schema_version": 1,
+        "seq": 65,
+        "event": "turn.artifacts",
+        "kind": "turn.artifacts",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:29:51.263078978+00:00",
+        "created_at": "2026-10-13T21:29:51.263078978+00:00",
+        "payload": {
+          "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+          "workspace": {
+            "state": "settled",
+            "pre_turn_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+            "post_turn_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+            "truncated": false,
+            "omitted": 0
+          },
+          "artifacts": []
+        },
+        "previous_seq": 64
+      }
+    }
+  ],
+  "event_names": [
+    "stream.progress",
+    "thread.started",
+    "stream.progress",
+    "turn.started",
+    "item.started",
+    "item.completed",
+    "turn.lifecycle",
+    "turn.workspace_snapshot",
+    "model.tools.snapshot",
+    "item.started",
+    "item.delta",
+    "item.completed",
+    "item.started",
+    "item.delta",
+    "item.delta",
+    "item.delta",
+    "turn.usage",
+    "item.completed",
+    "model.tools.snapshot",
+    "turn.workspace_snapshot",
+    "turn.completed",
+    "turn.artifacts"
+  ],
+  "recorded_at": "2026-10-13T21:29:52+00:00"
+}

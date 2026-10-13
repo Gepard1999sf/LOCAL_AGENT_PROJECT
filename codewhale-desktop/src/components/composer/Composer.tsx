@@ -8,6 +8,7 @@ import { api } from "../../lib/tauri";
 import { fuzzyScore } from "../../lib/format";
 import { Tip } from "../ui/primitives";
 import { exportThreadMarkdown } from "../../lib/export";
+import { relativeTo, threadWorkspace } from "../../lib/paths";
 
 interface Attachment {
   mime: string;
@@ -204,6 +205,11 @@ export function Composer({ threadId }: { threadId: string | null }) {
         return;
       }
     }
+    // Same condition as the disabled Send button: Enter must not send past it.
+    if (runtimeState !== "running") {
+      toast(runtimeState === "failed" ? "CodeWhale не запущен, сообщение не отправлено" : "CodeWhale ещё запускается, подождите");
+      return;
+    }
     setSending(true);
     const hist = loadHistory();
     if (value && hist.at(-1) !== value) saveHistory([...hist, value]);
@@ -248,7 +254,7 @@ export function Composer({ threadId }: { threadId: string | null }) {
       submit();
       return;
     }
-    // ↑ on an empty input edits the last message; Ctrl+↑/↓ walks the input history.
+    // ↑ on an empty input recalls the last sent input; Ctrl+↑/↓ walks the input history.
     if (e.key === "ArrowUp" && (e.ctrlKey || text === "")) {
       const hist = loadHistory();
       if (!hist.length) return;
@@ -294,7 +300,8 @@ export function Composer({ threadId }: { threadId: string | null }) {
       defaultPath: useApp.getState().settings?.workspace ?? undefined,
     });
     const paths = Array.isArray(picked) ? picked : picked ? [picked] : [];
-    const ws = (useApp.getState().settings?.workspace ?? "").replace(/[\\/]+$/, "").toLowerCase();
+    // Mentions are resolved by the agent against the thread's own workspace.
+    const ws = threadWorkspace(threadId);
     const mentions: string[] = [];
     for (const p of paths) {
       if (/\.(png|jpe?g|gif|webp)$/i.test(p)) {
@@ -305,8 +312,7 @@ export function Composer({ threadId }: { threadId: string | null }) {
           toast.error("Не удалось прикрепить изображение", { description: String(e) });
         }
       } else {
-        const rel = ws && p.toLowerCase().startsWith(ws) ? p.slice(ws.length + 1).replace(/\\/g, "/") : p;
-        mentions.push(`@${rel}`);
+        mentions.push(`@${relativeTo(p, ws) ?? p}`);
       }
     }
     if (mentions.length) setText((t) => (t ? t.trimEnd() + " " : "") + mentions.join(" ") + " ");

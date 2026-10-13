@@ -1,0 +1,25 @@
+{
+  "endpoint": "POST /v1/approvals/{approval_id}",
+  "phase": "extra",
+  "request": {
+    "method": "POST",
+    "path": "/v1/approvals/approval_717ee72058804c2994d6a6631a488e05",
+    "auth": true,
+    "body": {
+      "decision": "allow",
+      "remember": false
+    }
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "ok": true,
+      "approval_id": "approval_717ee72058804c2994d6a6631a488e05",
+      "decision": "allow",
+      "delivered": true
+    }
+  },
+  "elapsed_ms": 2,
+  "recorded_at": "2026-10-13T21:31:47+00:00"
+}

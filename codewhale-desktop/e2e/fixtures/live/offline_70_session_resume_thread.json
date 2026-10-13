@@ -1,0 +1,22 @@
+{
+  "endpoint": "POST /v1/sessions/{id}/resume-thread",
+  "phase": "offline",
+  "request": {
+    "method": "POST",
+    "path": "/v1/sessions/984976c1-10a8-47e3-ae4c-428ed41c9e45/resume-thread",
+    "auth": true,
+    "body": {}
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "thread_id": "thr_963d7ebe45bd4569abdebd205c4ec401",
+      "session_id": "984976c1-10a8-47e3-ae4c-428ed41c9e45",
+      "message_count": 0,
+      "summary": "Session 'New Session' is already open in thread thr_963d7ebe45bd4569abdebd205c4ec401 (0 messages)"
+    }
+  },
+  "elapsed_ms": 2,
+  "recorded_at": "2026-10-13T21:29:08+00:00"
+}

@@ -11,9 +11,11 @@ import type {
   SavedSession,
   ThreadRecord,
   ThreadSummary,
+  TurnRecord,
+  UserInputAnswer,
 } from "../lib/types";
 import { LITE_TOOLS } from "../lib/tools";
-import { useThreads } from "./threads";
+import { markStreamReplaying, useThreads } from "./threads";
 
 export type Overlay = null | "settings" | "palette" | "shortcuts" | "about" | "logs" | "models" | "usage";
 export type InspectorTab = "tools" | "files" | "context";
@@ -37,6 +39,8 @@ interface AppState {
   inspectorTab: InspectorTab;
   overlay: Overlay;
   search: string;
+  /** Thread ids in the order the sidebar lists them (Ctrl+1..9); null while it is not mounted. */
+  sidebarOrder: string[] | null;
   composerFocusTick: number;
   windowWidth: number;
 
@@ -51,7 +55,11 @@ interface AppState {
   refreshContext: (threadId: string) => Promise<void>;
   refreshBranch: () => Promise<void>;
   openThread: (threadId: string | null) => Promise<void>;
-  newThread: (opts?: { prompt?: string }) => Promise<string | null>;
+  /** Drops the local copy of a thread and replays it from scratch (retry after a stream error). */
+  reloadThread: (threadId: string) => Promise<void>;
+  /** Closes event streams of background threads that have no running turn. */
+  releaseIdleStreams: () => void;
+  newThread: () => Promise<string | null>;
   sendPrompt: (prompt: string, images?: Array<{ mime: string; dataBase64: string }>) => Promise<void>;
   interrupt: () => Promise<void>;
   setModel: (model: string) => Promise<void>;
@@ -61,17 +69,67 @@ interface AppState {
   resumeSession: (sessionId: string) => Promise<void>;
   setWorkspace: (path: string) => Promise<void>;
   decideApproval: (threadId: string, approvalId: string, allow: boolean, remember?: boolean) => Promise<void>;
+  answerUserInput: (threadId: string, inputId: string, answers: UserInputAnswer[]) => Promise<void>;
   setOverlay: (o: Overlay) => void;
   toggleSidebar: () => void;
   toggleInspector: () => void;
   setInspectorTab: (t: InspectorTab) => void;
   setSearch: (s: string) => void;
+  setSidebarOrder: (ids: string[] | null) => void;
   focusComposer: () => void;
   setWindowWidth: (w: number) => void;
 }
 
 function errMsg(e: unknown): string {
   return typeof e === "string" ? e : (e as any)?.message ?? JSON.stringify(e);
+}
+
+/** cw_request reports HTTP failures as "HTTP <status>: <message>". */
+function isNotFound(e: unknown): boolean {
+  return errMsg(e).startsWith("HTTP 404");
+}
+
+/** Normalized workspace path for comparison (Windows paths are case-insensitive). */
+function samePath(a: string | null | undefined, b: string | null | undefined): boolean {
+  const norm = (p: string) => p.replace(/\//g, "\\").replace(/\\+$/, "").toLowerCase();
+  return !!a && !!b && norm(a) === norm(b);
+}
+
+// Event streams (Rust `cw_subscribe`) this window holds, by thread id. Only the active
+// thread and threads with a running turn keep one; the rest are released.
+const streams = new Map<string, "open" | "closed">();
+
+async function openStream(threadId: string, fresh: boolean) {
+  const threads = useThreads.getState();
+  if (fresh || !threads.threads[threadId]) threads.reset(threadId);
+  // Resume after the last applied event; duplicates are dropped by seq anyway.
+  const since = useThreads.getState().threads[threadId]?.lastSeq ?? 0;
+  markStreamReplaying(threadId);
+  streams.set(threadId, "open");
+  try {
+    await api.subscribe(threadId, since);
+  } catch (e) {
+    streams.delete(threadId);
+    throw e;
+  }
+}
+
+function closeStream(threadId: string) {
+  streams.set(threadId, "closed");
+  api.unsubscribe(threadId).catch(() => {});
+}
+
+/** `latest_turn_status` values of a turn that is still working. The summary endpoint spells
+ *  a running turn "inprogress" (lowercased Debug name); the serde form is accepted too. */
+const ACTIVE_SUMMARY_STATUS = new Set(["queued", "inprogress", "in_progress"]);
+
+export function summaryTurnActive(s: ThreadSummary): boolean {
+  return ACTIVE_SUMMARY_STATUS.has(s.latest_turn_status ?? "");
+}
+
+function anyTurnRunning(summaries: ThreadSummary[]): boolean {
+  const local = Object.values(useThreads.getState().threads).some((t) => !!t.activeTurnId);
+  return local || summaries.some(summaryTurnActive);
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -93,6 +151,7 @@ export const useApp = create<AppState>((set, get) => ({
   inspectorTab: "tools",
   overlay: null,
   search: "",
+  sidebarOrder: null,
   composerFocusTick: 0,
   windowWidth: window.innerWidth,
 
@@ -166,14 +225,37 @@ export const useApp = create<AppState>((set, get) => ({
     const prev = get().activeThreadId;
     if (prev === threadId) return;
     set({ activeThreadId: threadId });
+    get().releaseIdleStreams();
     if (!threadId) return;
     const existing = useThreads.getState().threads[threadId];
-    if (!existing) {
-      useThreads.getState().reset(threadId);
-      await api.subscribe(threadId, 0).catch((e) => toast.error("Не удалось открыть сессию", { description: errMsg(e) }));
+    // A thread seen before keeps its events: re-open its stream from the last seq.
+    if (!existing || existing.streamState === "error" || streams.get(threadId) !== "open") {
+      await openStream(threadId, !existing || existing.streamState === "error").catch((e) =>
+        toast.error("Не удалось открыть сессию", { description: errMsg(e) }),
+      );
     }
     get().refreshContext(threadId);
     get().focusComposer();
+  },
+
+  reloadThread: async (threadId) => {
+    try {
+      await openStream(threadId, true);
+    } catch (e) {
+      toast.error("Не удалось открыть сессию", { description: errMsg(e) });
+    }
+    get().refreshThreads();
+  },
+
+  releaseIdleStreams: () => {
+    const active = get().activeThreadId;
+    const threads = useThreads.getState().threads;
+    // Also covers streams opened outside this store (they show up in the threads store).
+    const ids = new Set([...streams.keys(), ...Object.keys(threads)]);
+    for (const id of ids) {
+      if (id === active || streams.get(id) === "closed" || threads[id]?.activeTurnId) continue;
+      closeStream(id);
+    }
   },
 
   newThread: async () => {
@@ -185,9 +267,11 @@ export const useApp = create<AppState>((set, get) => ({
     if (s?.toolProfile !== "full") body.allowed_tools = LITE_TOOLS;
     try {
       const thread = await api.request<ThreadRecord>("POST", "/v1/threads", body);
-      useThreads.getState().reset(thread.id);
-      await api.subscribe(thread.id, 0);
+      // Active first (as in openThread): a releaseIdleStreams() firing while the
+      // subscribe is pending must not close the new thread's stream.
       set({ activeThreadId: thread.id });
+      get().releaseIdleStreams();
+      await openStream(thread.id, true);
       get().refreshThreads();
       get().refreshContext(thread.id);
       get().focusComposer();
@@ -210,7 +294,10 @@ export const useApp = create<AppState>((set, get) => ({
     if (s?.toolProfile !== "full") body.allowed_tools = LITE_TOOLS;
     if (images?.length) body.images = images;
     try {
-      await api.request("POST", `/v1/threads/${tid}/turns`, body);
+      const res = await api.request<{ turn?: TurnRecord }>("POST", `/v1/threads/${tid}/turns`, body);
+      // Mark the turn running right away so switching threads keeps its stream open.
+      if (res?.turn) useThreads.getState().noteTurnStarted(tid, res.turn);
+      if (streams.get(tid) !== "open") openStream(tid, false).catch(() => {});
       setTimeout(() => get().refreshThreads(), 400);
     } catch (e) {
       toast.error("Сообщение не отправлено", { description: errMsg(e) });
@@ -258,7 +345,7 @@ export const useApp = create<AppState>((set, get) => ({
   archiveThread: async (threadId) => {
     try {
       await api.request("PATCH", `/v1/threads/${threadId}`, { archived: true });
-      await api.unsubscribe(threadId);
+      closeStream(threadId);
       if (get().activeThreadId === threadId) set({ activeThreadId: null });
       get().refreshThreads();
       toast.success("Сессия перемещена в архив");
@@ -292,26 +379,58 @@ export const useApp = create<AppState>((set, get) => ({
 
   setWorkspace: async (path) => {
     const s = get().settings;
-    const recent = [path, ...(s?.recentWorkspaces ?? []).filter((p) => p !== path)].slice(0, 8);
-    await get().updateSettings({ workspace: path, recentWorkspaces: recent });
-    get().refreshBranch();
-    set({ activeThreadId: null });
-    // File search (@-mentions) is rooted at the server's working directory.
-    try {
-      set({ runtime: await api.runtimeRestart() });
-    } catch (e) {
-      toast.error("CodeWhale не перезапустился", { description: errMsg(e) });
+    if (samePath(path, s?.workspace)) return;
+    const apply = async () => {
+      const recent = [path, ...(get().settings?.recentWorkspaces ?? []).filter((p) => !samePath(p, path))].slice(0, 8);
+      await get().updateSettings({ workspace: path, recentWorkspaces: recent });
+      get().refreshBranch();
+      await get().openThread(null);
+      // File search (@-mentions) is rooted at the server's working directory.
+      try {
+        set({ runtime: await api.runtimeRestart() });
+      } catch (e) {
+        toast.error("CodeWhale не перезапустился", { description: errMsg(e) });
+      }
+      await get().refreshThreads();
+      toast.success("Проект выбран", { description: path });
+    };
+    // The restart kills every running turn: ask first.
+    if (anyTurnRunning(get().summaries)) {
+      toast.warning("Агент ещё работает", {
+        description: "Смена проекта перезапустит CodeWhale и прервёт текущую работу.",
+        duration: 15000,
+        action: { label: "Сменить проект", onClick: () => void apply() },
+        cancel: { label: "Отмена", onClick: () => {} },
+      });
+      return;
     }
-    await get().refreshThreads();
-    toast.success("Проект выбран", { description: path });
+    await apply();
   },
 
   decideApproval: async (threadId, approvalId, allow, remember = false) => {
-    useThreads.getState().markApproval(threadId, approvalId, allow ? "allowed" : "denied");
+    const status = allow ? "allowed" : "denied";
+    const prev = useThreads.getState().threads[threadId]?.approvals[approvalId]?.status;
+    useThreads.getState().markApproval(threadId, approvalId, status);
     try {
       await api.request("POST", `/v1/approvals/${approvalId}`, { decision: allow ? "allow" : "deny", remember });
     } catch (e) {
-      toast.error("Решение не отправлено", { description: errMsg(e) });
+      // 404: nothing is pending under this id any more; the approval.* event settles the card.
+      const cur = useThreads.getState().threads[threadId]?.approvals[approvalId]?.status;
+      if (!isNotFound(e) && prev && cur === status) useThreads.getState().markApproval(threadId, approvalId, prev);
+      toast.error(isNotFound(e) ? "Запрос уже закрыт" : "Решение не отправлено", { description: errMsg(e) });
+    }
+  },
+
+  answerUserInput: async (threadId, inputId, answers) => {
+    const threads = useThreads.getState();
+    const prev = threads.threads[threadId]?.userInputs[inputId]?.status;
+    threads.markUserInput(threadId, inputId, "answered", answers);
+    try {
+      await api.request("POST", `/v1/user-input/${threadId}/${inputId}`, { answers });
+    } catch (e) {
+      const cur = useThreads.getState().threads[threadId]?.userInputs[inputId]?.status;
+      if (!isNotFound(e) && prev && cur === "answered") useThreads.getState().markUserInput(threadId, inputId, prev);
+      toast.error(isNotFound(e) ? "Вопрос уже закрыт" : "Ответ не отправлен", { description: errMsg(e) });
     }
   },
 
@@ -320,6 +439,7 @@ export const useApp = create<AppState>((set, get) => ({
   toggleInspector: () => set((s) => ({ inspectorCollapsed: !s.inspectorCollapsed })),
   setInspectorTab: (inspectorTab) => set({ inspectorTab, inspectorCollapsed: false }),
   setSearch: (search) => set({ search }),
+  setSidebarOrder: (sidebarOrder) => set({ sidebarOrder }),
   focusComposer: () => set((s) => ({ composerFocusTick: s.composerFocusTick + 1 })),
   setWindowWidth: (windowWidth) => set({ windowWidth }),
 }));

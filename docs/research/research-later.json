@@ -1,0 +1,672 @@
+[
+ {
+  "name": "Benchmark hygiene plus a built-in local acceptance test per model",
+  "what": "Public numbers for local models are mostly vendor-run on custom scaffolds, SWE-bench Verified is officially deprecated as saturated and contaminated, and the Aider polyglot leaderboard is stale. The most reliable signal is a small, quality-checked test run on the user's own GPU, through CodeWhale's real tools and the same Ollama path.",
+  "how": "Add a 'Qualify model' action to the model menu (CommandPalette.tsx and SettingsPanel.tsx) that runs 6-8 short scripted tasks through the CodeWhale sidecar against the chosen Ollama variant: valid JSON tool call, multi-tool sequence, a 300-400 line file write through the edit tool (catches the parser bug), a read-search-patch on a fixture repo, and a Godot task (fix a deliberately broken .gdshader until the existing compile-check passes). Record pass/fail, tokens per second (from Ollama's eval_count/eval_duration), time-to-first-token and peak VRAM. Show an 'Agent-ready' badge and a per-model scorecard. In the catalog, show vendor benchmarks with a 'vendor scaffold' label, prefer SWE-bench Pro / Terminal-Bench 2.x and uniform-harness numbers, and drop Aider polyglot from model cards.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "beta",
+  "sources": [
+   "https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/",
+   "https://benchlm.ai/benchmarks/terminal-bench-2",
+   "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4",
+   "https://raw.githubusercontent.com/Aider-AI/aider/main/aider/website/_data/polyglot_leaderboard.yml",
+   "https://github.com/outsourc-e/qwen36-4090-recipes",
+   "https://huggingface.co/Qwen/Qwen3.8-27B"
+  ]
+ },
+ {
+  "name": "Optional llama.cpp (llama-server) backend: --fit, MoE expert offload, same-vocab speculative decoding",
+  "what": "Mainline llama.cpp now auto-fits context and layers to free VRAM, can keep only MoE expert weights in system RAM, can cache hot experts on the GPU, and supports draft-model and MTP speculative decoding. These are the main features Ollama does not expose per model, and they matter most on 12-16 GB GPUs and for MoE models.",
+  "how": "Add an opt-in 'Advanced engine: llama-server' in settings.rs and SettingsPanel. The app downloads a pinned llama.cpp CUDA build for Windows, reuses Ollama's GGUF blobs (path taken from the /api/show modelfile FROM line, so there is no re-download), launches llama-server through winproc.rs with `--fit on --jinja` plus an auto-computed `--n-cpu-moe` for MoE models, and points CodeWhale at it through the existing `[providers.vllm]`/custom OpenAI-compatible route (http://127.0.0.1:<port>/v1). For Qwen3.6/3.8-27B on 24 GB, offer a 'Speed boost' toggle that adds a Qwen3.5-4B same-vocab draft. Never offer cross-vocab drafts, because tool-call and JSON integrity is non-negotiable for an agent.",
+  "impact": "medium",
+  "effort": "L",
+  "maturity": "beta",
+  "sources": [
+   "https://raw.githubusercontent.com/ggml-org/llama.cpp/master/common/arg.cpp",
+   "https://raw.githubusercontent.com/ggml-org/llama.cpp/master/tools/fit-params/README.md",
+   "https://github.com/outsourc-e/qwen36-4090-recipes",
+   "https://github.com/ollama/ollama/issues/11772"
+  ]
+ },
+ {
+  "name": "NVIDIA Nemotron 3.5 Lightning / Nemotron 3 Nano (30B-A3B hybrid Mamba-MoE): speed-first agent executor",
+  "what": "NVIDIA's open 30B-A3B hybrid Mamba-Transformer MoE models. Lightning, released August 2026, is tuned for fast agent execution and ships with speculative decoding in its Ollama recipe. Its coding accuracy is clearly below Qwen3.6-35B-A3B, so it suits sub-agent or explore roles rather than the main coder.",
+  "how": "Offer it as an optional 'fast helper' model when CodeWhale's sub-agent or explore features are used: the main coder stays on Qwen3.8-27B, and cheap search or summarize steps go to Lightning. Because both models must be resident, the fit estimator must budget both (OLLAMA_MAX_LOADED_MODELS); on 24 GB this only works with the helper partly offloaded, so show the estimate before enabling it. Run the acceptance test before marking it agent-ready.",
+  "impact": "low",
+  "effort": "M",
+  "maturity": "beta",
+  "sources": [
+   "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4",
+   "https://ollama.com/library/nemotron-3.5-lightning",
+   "https://catalog.ngc.nvidia.com/orgs/nim/nvidia/models/nemotron-3.5-lightning/-",
+   "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+   "https://arxiv.org/pdf/2512.20848"
+  ]
+ },
+ {
+  "name": "llama.cpp --fit auto-placement with automatic MoE expert offload to CPU (inside Ollama ≥0.30)",
+  "what": "Ollama 0.30 (May 2026) switched its GGUF engine on NVIDIA to upstream llama-server. It passes almost no placement flags, so llama.cpp's --fit (on by default) decides layer placement. When VRAM is short, fit first keeps dense or attention weights on GPU and moves sparse MoE expert tensors to system RAM. That makes 35B-A3B-class MoE models usable on 6–16 GB cards.",
+  "how": "(1) Require Ollama ≥0.30 (recommend ≥0.40.3) in useBootstrap and show a banner on older versions. (2) Never send num_gpu by default, because that disables fit. (3) Add a 'Reserve VRAM for other apps (Godot editor, browser)' slider that maps to LLAMA_ARG_FIT_TARGET in MiB on the managed server; default 1024, suggest 2048 when Godot is running. (4) In the model picker, mark MoE models (expert_count > 0 in /api/show model_info) as 'good for small GPU: experts go to RAM'. Show the measured split from /api/ps (size_vram vs size), which Inspector already shows, and add a short note explaining that partial offload of a MoE model is expected and fine. (5) For the llama.cpp provider, run llama-fit-params --model X -c N before launch and show the fitted -ngl/-ot result as a 'Fit preview'. Do not inject LLAMA_ARG_N_CPU_MOE into Ollama: it conflicts with fit.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/ollama/ollama/releases?page=5",
+   "https://github.com/ollama/ollama/blob/main/llm/llama_server.go",
+   "https://github.com/ollama/ollama/blob/main/envconfig/config.go",
+   "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md",
+   "https://github.com/ggml-org/llama.cpp/blob/master/common/fit.cpp",
+   "https://github.com/ggml-org/llama.cpp/blob/master/tools/fit-params/README.md",
+   "https://github.com/ggml-org/llama.cpp/discussions/21112"
+  ]
+ },
+ {
+  "name": "MTP speculative decoding (model's own multi-token-prediction heads) via Ollama draft_num_predict / llama.cpp --spec-type draft-mtp",
+  "what": "Some models (Qwen3.5/3.6, Gemma 4, GLM, DeepSeek and others) ship MTP heads that draft several tokens, which the main model then verifies losslessly. llama.cpp merged MTP in May 2026. Ollama's llama-server path enables it only when draft_num_predict is set. The default for embedded MTP is 0 (off).",
+  "how": "In ollama_models (src-tauri/src/ollama.rs), add an 'mtp' capability flag when /api/show model_info contains a '*.nextn_predict_layers' key > 0. Verify the key name on the target build. In the variant dialog, add a 'Speed boost (MTP)' toggle that passes parameters {num_ctx, draft_num_predict: 2} to /api/create (2 is the best value in the 6 GB report; 3 for larger GPUs). Add a one-click A/B bench: send the same 300-token coding prompt to the base model and the MTP variant, then read 'timings.predicted_per_second' and prompt_per_second from the OpenAI response. Keep the variant only if generation improves and prefill loss is acceptable, because agent turns are often prefill-heavy. Budget ~10% extra VRAM in the Context wizard.",
+  "impact": "high",
+  "effort": "S",
+  "maturity": "beta",
+  "sources": [
+   "https://github.com/ggml-org/llama.cpp/pull/22673",
+   "https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx",
+   "https://github.com/ollama/ollama/blob/main/llm/llama_server.go",
+   "https://github.com/ollama/ollama/blob/main/server/routes.go",
+   "https://github.com/ggml-org/llama.cpp/blob/master/docs/speculative.md",
+   "https://github.com/ollama/ollama/releases?page=4",
+   "https://github.com/ollama/ollama/releases?page=3"
+  ]
+ },
+ {
+  "name": "Prompt/KV prefix-cache hygiene for agent loops (cached_tokens, checkpoints for hybrid models, keep_alive)",
+  "what": "In agent loops most of each request repeats the previous prompt, so local speed depends on reusing the KV prefix. Ollama now reports cached prompt tokens and fixed several agent-specific cache breakers. Hybrid/recurrent models (Qwen3.5/3.6 family) can only roll back to saved checkpoints. Unloading the model (default keep_alive 5m) throws the whole cache away.",
+  "how": "(1) If app-server events carry usage, add a StatusBar segment 'Cache 92% · 41 tok/s' per turn, computed from cached_tokens/prompt_tokens and timings. Alert when the hit rate collapses on a long thread, which means a prefix breaker such as a timestamp or reordered system prompt. (2) Default the managed server to OLLAMA_KEEP_ALIVE=2h (or -1 with an 'Unload' button; ollama_unload already exists), so stepping away for 6 minutes does not cost a full re-prefill of a 50k-token context. (3) For Qwen3.5/3.6-family models, prefer CodeWhale settings that only append to history; trigger compaction rarely (the threshold item), since every rewrite of earlier context forces re-prefill from the last checkpoint. (4) Before a long session, warm up the model with POST /api/generate {model, keep_alive}.",
+  "impact": "high",
+  "effort": "S",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/ollama/ollama/releases?page=2",
+   "https://github.com/ollama/ollama/releases?page=4",
+   "https://github.com/ollama/ollama/blob/main/openai/openai.go",
+   "https://github.com/ollama/ollama/blob/main/docs/faq.mdx",
+   "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md"
+  ]
+ },
+ {
+  "name": "llama.cpp llama-server as a first-class managed provider (router mode + INI presets)",
+  "what": "Upstream llama-server exposes everything Ollama hides: per-model presets, split K/V types, n-gram and model-based speculative decoding, manual MoE offload, reasoning budgets, idle sleep, and a router that loads models on demand. It installs on Windows via winget, and CodeWhale can reach it as a custom OpenAI-compatible provider.",
+  "how": "Add an 'Engine: Ollama | llama.cpp' switch. In llama.cpp mode, the desktop detects llama-server.exe (winget path or a user-picked folder) and generates %APPDATA%/CodeWhale/llamacpp-presets.ini from the same UI controls (ctx, -ctk/-ctv, spec-type, n-cpu-moe, reasoning-budget, sleep-idle-seconds 900). It launches 'llama-server --models-dir <GGUF dir> --models-preset <ini> --models-max 1 --port 8081 --no-webui' and writes [providers.llamacpp] kind=\"openai-compatible\", base_url=\"http://127.0.0.1:8081/v1\", context_window=<ctx> into the CodeWhale config. This is the 'power-user' path for users with GGUFs from Hugging Face (Unsloth MTP/MXFP4 quants) and for Godot shader loops that benefit from n-gram drafting.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md",
+   "https://github.com/ggml-org/llama.cpp/blob/master/docs/preset.md",
+   "https://github.com/ggml-org/llama.cpp/blob/master/docs/install.md",
+   "https://github.com/ggml-org/llama.cpp/releases/tag/v0.6.0",
+   "https://github.com/Hmbown/CodeWhale"
+  ]
+ },
+ {
+  "name": "Draftless n-gram speculative decoding (ngram-mod / ngram-simple) for code rewriting",
+  "what": "llama.cpp can draft tokens from n-grams already present in the context, with no extra model and about 16 MB of memory. This is very effective when the model re-emits existing code: whole-file edits, apply_patch context, and fixing a shader after a compile error. Ollama does not expose it; only llama-server does.",
+  "how": "In the llama.cpp provider presets, add 'spec-default = 1' by default for coding models (or spec-type = ngram-mod), with a 'Code-rewrite turbo' toggle. Show the acceptance rate from llama-server timings and logs in the Inspector. For the Godot shader skill and compile-check loop, keep the shader source in context verbatim, because n-gram drafting then accelerates the corrected re-emit. Because of the CRLF report, suggest normalising .gdshader/.gd files to LF (or warn when the workspace uses CRLF). A Windows-specific tip.",
+  "impact": "medium",
+  "effort": "S",
+  "maturity": "beta",
+  "sources": [
+   "https://github.com/ggml-org/llama.cpp/blob/master/docs/speculative.md",
+   "https://github.com/ggml-org/llama.cpp/pull/19164",
+   "https://github.com/ggml-org/llama.cpp/blob/master/common/arg.cpp",
+   "https://github.com/ollama/ollama/blob/main/llm/llama_server.go"
+  ]
+ },
+ {
+  "name": "Parallel slots vs CodeWhale sub-agents (OLLAMA_NUM_PARALLEL, forced single slot for hybrid models)",
+  "what": "CodeWhale can fan out many sub-agents, but a local server serves one request at a time by default. Each parallel slot multiplies KV memory. Ollama silently forces one slot for several hybrid or recurrent architectures, including the Qwen3.5/3.6 family.",
+  "how": "Add a 'Parallel requests' control (1/2/4). It sets OLLAMA_NUM_PARALLEL on the managed server and also writes [subagents] max_concurrent = same value into the CodeWhale config, so sub-agents do not pile up in Ollama's queue and hit api_timeout_secs. The Context wizard divides available KV memory by the slot count. If the selected model's family is in Ollama's forced-1 list (from /api/show details.family), lock the control at 1 with an explanation, and suggest the llama.cpp provider when parallel sub-agents matter.",
+  "impact": "medium",
+  "effort": "S",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/ollama/ollama/blob/main/docs/faq.mdx",
+   "https://github.com/ollama/ollama/blob/main/llm/llama_server.go",
+   "https://github.com/ollama/ollama/blob/main/server/sched.go",
+   "https://github.com/lmstudio-ai/docs/blob/main/0_app/5_advanced/parallel-requests.md",
+   "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md",
+   "https://github.com/Hmbown/CodeWhale"
+  ]
+ },
+ {
+  "name": "Quantization formats in 2026: Q4_K_M / IQ4_XS, QAT tags, MXFP4, and native NVFP4 on RTX 50 (Blackwell)",
+  "what": "Weight-format choice sets both what fits on the GPU and how fast it runs. Quantization-aware-trained (QAT) tags retain quality at 4 bits. MXFP4 is gpt-oss's native format and the MXFP4_MOE recipe. NVFP4 and MXFP4 use Blackwell FP4 tensor cores in llama.cpp CUDA, so RTX 50 owners get faster prefill.",
+  "how": "In the model picker, show details.quantization_level from /api/tags and /api/show next to size and estimated KV. Add a 'Recommended for your GPU' hint: on compute capability 12.x (RTX 50, read via nvidia-smi --query-gpu=compute_cap) prefer NVFP4/MXFP4 builds; on others prefer -qat tags, then Q4_K_M, then IQ4_XS when VRAM is tight. Weight prefill speed heavily, because agent turns are prefill-bound. Never auto-pull. Present the choice and the size delta.",
+  "impact": "medium",
+  "effort": "S",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/ggml-org/llama.cpp/blob/master/ggml/include/ggml.h",
+   "https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-cuda/common.cuh",
+   "https://github.com/ggml-org/llama.cpp/blob/master/tools/quantize/quantize.cpp",
+   "https://github.com/ollama/ollama/releases?page=5",
+   "https://github.com/ollama/ollama/releases?page=2",
+   "https://developer.nvidia.com/blog/open-source-ai-tool-upgrades-speed-up-llm-and-diffusion-models-on-nvidia-rtx-pcs",
+   "https://insiderllm.com/guides/fp4-inference-llamacpp-nvfp4-mxfp4/"
+  ]
+ },
+ {
+  "name": "LM Studio 0.4.x as an alternative provider (llmster headless daemon, REST load with per-model context)",
+  "what": "LM Studio 0.4 added llmster, a GUI-less daemon installable on Windows. It also added parallel requests via continuous batching, a native REST API that loads models with an explicit context length, flash-attention flag and KV-offload setting, and OpenAI Responses plus Anthropic Messages compatibility on port 1234.",
+  "how": "Auto-detect http://127.0.0.1:1234 at startup in useBootstrap. Offer 'Use LM Studio' to write the custom provider [providers.lm-studio] kind=\"openai-compatible\", which CodeWhale already supports and tests. Before a session, call POST /api/v1/models/load {model, context_length, flash_attention: true, echo_load_config: true}, so the context is set without the Modelfile-variant workaround. Read back load_config and sync context_window. Use 'lms load --estimate-only' for a pre-load memory estimate in the Context wizard.",
+  "impact": "medium",
+  "effort": "S",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/lmstudio-ai/docs/blob/main/1_developer/0_core/headless.md",
+   "https://github.com/lmstudio-ai/docs/blob/main/1_developer/2_rest/load.md",
+   "https://github.com/lmstudio-ai/docs/blob/main/3_cli/0_local-models/load.md",
+   "https://github.com/lmstudio-ai/docs/blob/main/1_developer/api-changelog.md",
+   "https://github.com/lmstudio-ai/docs/blob/main/0_app/5_advanced/parallel-requests.md"
+  ]
+ },
+ {
+  "name": "Trained draft models: DFlash, DSpark, EAGLE-3 (paired with a specific target)",
+  "what": "Newer speculative-decoding drafters read the target model's hidden states. DFlash drafts a whole block in one forward pass (block diffusion); DSpark adds a Markov head. Both reach much higher acceptance than a standalone small model. llama.cpp supports all three. Ollama on NVIDIA accepts DFlash and external drafts in models it packages.",
+  "how": "In the llama.cpp provider, keep a small curated 'target → draft' table: Qwen3-4B → z-lab DFlash or DSpark (the user already runs qwen3-4b-32k), and gemma-4-26B-A4B → EAGLE-3. Offer one click to download the draft GGUF and add 'model-draft' plus 'spec-type' lines to the preset. Show measured acceptance and tok/s versus no-draft using the same A/B bench as the MTP item. Mark it experimental, because drafts are target-specific and the paper's 6x figure is from datacenter GPUs.",
+  "impact": "medium",
+  "effort": "M",
+  "maturity": "experimental",
+  "sources": [
+   "https://arxiv.org/abs/2602.06036",
+   "https://github.com/ggml-org/llama.cpp/blob/master/docs/speculative.md",
+   "https://github.com/ollama/ollama/blob/main/llm/llama_server.go",
+   "https://github.com/ollama/ollama/releases?page=3"
+  ]
+ },
+ {
+  "name": "vLLM / SGLang (WSL2 only) and ExLlamaV3 + TabbyAPI (native Windows): advanced backends to detect, not bundle",
+  "what": "vLLM and SGLang give the best batched throughput but are Linux-first; on Windows they run under WSL2 or Docker. ExLlamaV3 (EXL3, QTIP-based quantization, 2–8-bit cache, MTP and n-gram drafting) runs on native Windows through TabbyAPI. TabbyAPI describes itself as a hobby project.",
+  "how": "Add an 'Advanced backends' section that only probes known ports: 8000 for vLLM (WSL2 forwards localhost), 30000 for SGLang and 5000 for TabbyAPI. When a probe answers, offer to write the matching CodeWhale provider (vllm, sglang, or a custom openai-compatible provider for TabbyAPI) with context_window read from /v1/models. Do not install or manage these backends. Recommend them only for users who need many parallel sub-agents (vLLM/SGLang) or the best quality per VRAM with EXL3 on a 16–24 GB card (TabbyAPI).",
+  "impact": "low",
+  "effort": "M",
+  "maturity": "beta",
+  "sources": [
+   "https://github.com/vllm-project/vllm/blob/main/docs/getting_started/installation/gpu.md",
+   "https://www.docker.com/blog/docker-model-runner-vllm-windows/",
+   "https://github.com/sgl-project/sglang",
+   "https://github.com/turboderp-org/exllamav3/blob/master/README.md",
+   "https://github.com/theroyallab/tabbyAPI/blob/main/README.md",
+   "https://github.com/theroyallab/tabbyAPI/blob/main/config_sample.yml",
+   "https://github.com/Hmbown/CodeWhale"
+  ]
+ },
+ {
+  "name": "Edit-format adaptation per model and file size (whole-file vs search/replace vs line-marked diff)",
+  "what": "The best edit format depends on model size. Small models rarely produce well-formed diffs but almost always produce well-formed whole files. Choosing the format per model and file size, applying edits flexibly, and tracking each model's 'well-formed edit rate' cuts failed edits sharply.",
+  "how": "CodeWhale's crates/tui/src/tools/file.rs already does search/replace with fuzzy normalization and old_string/new_string aliasing. Add an edit policy:\n- For local models ≤8B and target files ≤~300 lines (shaders, small scripts), steer toward write_file whole-file rewrites. Rely on the syntax/verify gate (verify-on-edit item) and a Desktop diff preview to catch damage.\n- Use search/replace otherwise.\n- On a no-match, return the 3 closest line windows (similarity-ranked) so the model can retry with exact text instead of guessing.\n- Track each model's edit well-formed rate in scorecard.rs and switch format automatically when it drops below ~85%.\n- Experimental: an optional FastApply-1.5B GGUF 'apply model' for lazy '// ... existing code ...' snippets, enabled only if VRAM fits alongside the main model.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/Aider-AI/aider/blob/main/aider/website/_data/polyglot_leaderboard.yml",
+   "https://github.com/Aider-AI/aider/blob/main/aider/website/_data/edit_leaderboard.yml",
+   "https://aider.chat/docs/unified-diffs.html",
+   "https://aider.chat/docs/more/edit-formats.html",
+   "https://arxiv.org/abs/2510.12487",
+   "https://huggingface.co/Kortix/FastApply-7B-v1.0"
+  ]
+ },
+ {
+  "name": "Observation masking before LLM summarization (tiered context compaction)",
+  "what": "Replace old tool outputs with short stubs and keep the agent's reasoning and actions. A study within SWE-agent found this cuts cost about in half while matching or slightly exceeding the solve rate of LLM summarization. It is deterministic and needs no extra model call, which suits weak local models whose summaries are unreliable.",
+  "how": "CodeWhale's compaction (crates/tui/src/compaction, SURVIVAL_CONTRACT.md) is LLM-summary based. Run by a 4B model, that is slow and lossy. Add a tier-0 'mask' pass:\n- Replace tool_result blocks older than the last M=10 observations with a stub: '[elided: <tool> <args digest>, <n> lines — retrieve_tool_result id=…]'. Spilled outputs already exist via large_output_router.rs and tool_result_retrieval.rs.\n- Never mask the protected last round or assistant actions.\n- Mask in batches (every ~10 turns, or at 50% window pressure), not every turn, so the KV-cache prefix stays stable (prefix-caching item).\n- Call the LLM summary only at ≥75% pressure (ContextBudget).\nDesktop: show a context meter (raw vs masked tokens) and a 'masked N outputs' chip.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "beta",
+  "sources": [
+   "https://arxiv.org/abs/2508.21433",
+   "https://github.com/JetBrains-Research/the-complexity-trap",
+   "https://blog.jetbrains.com/research/2025/12/efficient-context-management/",
+   "https://openhands.dev/blog/openhands-context-condensensation-for-more-efficient-ai-agents",
+   "https://docs.openhands.dev/sdk/guides/context-condenser",
+   "https://research.trychroma.com/context-rot",
+   "https://opencode.ai/docs/agents/"
+  ]
+ },
+ {
+  "name": "Prefix-stable prompts plus KV/prompt-cache reuse across turns (Ollama / llama-server)",
+  "what": "On a single consumer GPU, re-processing a 10–30k-token prefix every turn dominates latency. Keeping the system prompt and tool catalog byte-identical and the history append-only means only the new suffix is evaluated. Exposing the cache-hit rate makes cache-breaking regressions visible.",
+  "how": "CodeWhale already has crates/runtime/src/prompt_zones.rs (PinnedPrefix / AppendLog / TurnScratch with sha256 drift detection), but it is marked 'not yet wired into the request path'. Wire it for local routes:\n- Freeze the system prompt and the tool list in sorted order. Keep timestamps, git status and budget warnings out of the system prompt.\n- Append per-turn state only at the tail.\n- Mutate history only at compaction events.\nDesktop changes:\n- Read `prompt_eval_cached_count` / `prompt_eval_count` (or cached-token usage, if /v1 exposes it) and show 'cache hit 96% · TTFT 0.8s' per turn. Alert when PrefixDrift fires.\n- Set a long keep_alive (30m or -1) for the active model.\n- On one GPU, keep sub-agents and title generation on the same model rather than swapping, because a swap evicts the whole cache.\n- For power users on a raw llama-server route, expose --cache-reuse, which helps masked or compacted histories reuse the unchanged tail.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/ollama/ollama/blob/main/llm/server.go",
+   "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md",
+   "https://github.com/ollama/ollama/releases/tag/v0.33.3",
+   "https://github.com/ollama/ollama/releases/tag/v0.33.0",
+   "https://github.com/ollama/ollama/blob/main/docs/api.md",
+   "https://github.com/ollama/ollama/issues/17351",
+   "https://github.com/ollama/ollama/blob/main/docs/faq.mdx"
+  ]
+ },
+ {
+  "name": "Repo map: tree-sitter symbols plus personalized PageRank in a fixed token budget",
+  "what": "A compact map of the repository's most-referenced symbols gives a small-context model orientation for about 1k tokens. It reduces blind grep/read loops and helps new code reuse existing APIs. Aider pioneered it, and repository-graph augmentation (RepoGraph) improved every SWE-bench framework it was tested with.",
+  "how": "Add a `repo_map` tool and context fragment, either in CodeWhale or precomputed by Desktop (src-tauri) and injected as project context:\n- Use tree-sitter tag queries for Rust/TS/Python/GDScript, plus gdshader uniforms and functions.\n- Build a file graph from identifier references and run a ~40-line personalized PageRank power iteration (petgraph has no personalization), seeded by files open or @-mentioned in the Desktop composer.\n- Render signature lines in a budget that scales with the real num_ctx: about 1k tokens for 8–16k windows, 2k for 32k and above.\n- Cache by mtime. Inject once after the frozen prefix and refresh only on demand, to keep the KV cache warm.\nDesktop: a 'Repo map' panel showing exactly what the model sees.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://aider.chat/docs/repomap.html",
+   "https://aider.chat/2023/10/22/repomap.html",
+   "https://github.com/Aider-AI/aider/blob/main/aider/repomap.py",
+   "https://arxiv.org/abs/2410.14684",
+   "https://cline.bot/blog/why-cline-doesnt-index-your-codebase-and-why-thats-a-good-thing",
+   "https://github.com/PrestonKnopp/tree-sitter-gdscript",
+   "https://doc.servo.org/petgraph/algo/page_rank/fn.page_rank.html"
+  ]
+ },
+ {
+  "name": "Plan→Act split (architect/editor) tuned for a single GPU",
+  "what": "Separating 'decide what to change' from 'emit the exact edits' lets each phase use the best setting: thinking-heavy planning, then lean, precise acting. Aider's architect/editor pairing produced SOTA results and roughly tripled pass rate for a local-class model pair. Cline and OpenCode ship Plan/Act modes as first-class features.",
+  "how": "CodeWhale already has Plan/Act/Operate modes (HookEvent::ModeChange) plus crates/tui/src/tools/plan.rs and workflow_plan_approval.rs. Desktop adds per-mode presets:\n- Plan: the same local model with think=high and read-only tools. Output is a structured plan (constrained-decoding item): files, steps, and the verify command for each step.\n- Act: think off/low, the Local-lean tool profile, and one plan step per turn. After 2 consecutive failed verify gates it returns to Plan automatically.\nA two-model architect/editor mode is offered only when /api/ps size_vram plus nvidia-smi free memory show both models fit. Otherwise use the same model with different think levels, which avoids a reload and keeps the KV cache.",
+  "impact": "medium",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://aider.chat/2024/09/26/architect.html",
+   "https://github.com/Aider-AI/aider/blob/main/aider/website/_data/polyglot_leaderboard.yml",
+   "https://github.com/cline/cline/blob/main/docs/core-workflows/plan-and-act.mdx",
+   "https://opencode.ai/docs/agents/"
+  ]
+ },
+ {
+  "name": "Constrained decoding for internal structured sub-calls (not for reasoning)",
+  "what": "Use JSON-schema/grammar-constrained decoding for CodeWhale's machine-consumed outputs: compaction summaries, plans, verdicts, titles and routing. These then always parse, even from a 4B model. Leave reasoning and main agent turns unconstrained, because strict formats measurably hurt reasoning.",
+  "how": "Route CodeWhale's non-conversational sub-calls through native POST /api/chat with `format: <JSON schema>`. This can live in the Desktop shim or as an Ollama-native path in CodeWhale's client. Targets:\n- compaction summaries (schema = the SURVIVAL_CONTRACT.md 'survive' fields)\n- the plan object for Plan mode\n- todo updates\n- verifier verdict classification\n- commit messages, session titles and routing decisions\nKeep `think` on where useful, so reasoning goes to message.thinking and only the final answer is constrained (CRANE-style). Keep schemas flat, avoid the unsupported keywords, and repeat the schema in the prompt as Ollama's docs advise. Never set `format` on main agent turns.",
+  "impact": "medium",
+  "effort": "S",
+  "maturity": "production",
+  "sources": [
+   "https://arxiv.org/abs/2408.02442",
+   "https://arxiv.org/abs/2502.09061",
+   "https://arxiv.org/abs/2501.10868",
+   "https://github.com/ollama/ollama/releases/tag/v0.34.4",
+   "https://github.com/ollama/ollama/blob/main/docs/capabilities/structured-outputs.mdx",
+   "https://github.com/ggml-org/llama.cpp/blob/master/grammars/README.md",
+   "https://github.com/ggml-org/llama.cpp/blob/master/docs/llguidance.md"
+  ]
+ },
+ {
+  "name": "Optional local semantic code search (small embedding model, hybrid with ripgrep)",
+  "what": "An opt-in background index of AST-chunked code, embedded with a sub-1B local model and fused with keyword search. It helps small models that explore poorly find the right files in one step. Leading agents (Cline, Continue) moved away from pure RAG, so this should supplement grep, not replace it.",
+  "how": "Add a Desktop background indexer (src-tauri), off by default:\n- Chunk by tree-sitter function/class, reusing the repo-map parser.\n- Embed via Ollama /api/embed with qwen3-embedding:0.6b or embeddinggemma at 256–512 dims, using a task instruction for queries.\n- Store in a per-workspace SQLite vector table and update incrementally from git diff and mtime.\n- Expose a `semantic_search(query,k)` tool that returns file:line ranges, fused with ripgrep hits by reciprocal-rank fusion.\nSkip the 0.6B reranker, which hurt code retrieval in Qwen's own table. Offer the 4B reranker only via llama-server when VRAM allows. Index while idle, with a short keep_alive on the embed model so VRAM goes back to the chat model. For ≤8B models, optionally auto-attach the top 5 locations to the first turn.",
+  "impact": "medium",
+  "effort": "L",
+  "maturity": "beta",
+  "sources": [
+   "https://github.com/QwenLM/Qwen3-Embedding",
+   "https://siliconangle.com/2026/10/06/google-expands-embeddinggemma-beyond-text-to-images-audio-and-video/",
+   "https://github.com/ollama/ollama/releases",
+   "https://github.com/ollama/ollama/blob/main/docs/api.md",
+   "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md",
+   "https://cline.bot/blog/why-cline-doesnt-index-your-codebase-and-why-thats-a-good-thing",
+   "https://docs.continue.dev/reference/deprecated-codebase"
+  ]
+ },
+ {
+  "name": "Verifier-guided test-time scaling (best-of-N candidate fixes in worktrees)",
+  "what": "When a small model keeps failing a checkable task (shader doesn't compile, test fails), sample several candidate edits and let the deterministic verifier pick. Combining execution-based and model-based verifiers beats either one alone. This trades local GPU time, which is free, for reliability.",
+  "how": "Add a 'Try N fixes' action in Desktop. It appears automatically after the verify-on-edit retry cap is hit, e.g. a .gdshader still failing check-shader.ps1 after 3 attempts.\n- Generate N=2–4 candidate edits at temperature ~0.7, sequentially, or with OLLAMA_NUM_PARALLEL=2 at a reduced num_ctx.\n- Apply each in a temporary git worktree.\n- Run the verifier map on each and keep only the passing candidates.\n- Break ties by smallest diff, or with a cheap judge: the same model with a constrained yes/no verdict, or experimentally an Ollama decision model's `noul` probability for 'this diff fixes the reported error'.\n- Show the survivors side by side for the user to pick.\nThis fits short compile-checkable artifacts best: shaders, small scripts, single failing tests.",
+  "impact": "medium",
+  "effort": "L",
+  "maturity": "beta",
+  "sources": [
+   "https://arxiv.org/abs/2504.07164",
+   "https://arxiv.org/abs/2407.01489",
+   "https://github.com/ollama/ollama/blob/main/docs/faq.mdx",
+   "https://github.com/ollama/ollama/releases/tag/v0.35.0"
+  ]
+ },
+ {
+  "name": "MCP server manager in the desktop (CRUD, tool allowlists, OAuth, registry) with a Godot MCP preset",
+  "what": "CodeWhale's Runtime API can create, update, enable, disable and reconnect MCP servers and list their tools, with per-server tool allowlists and environment-backed credentials. The desktop has no MCP UI. With small local models, keeping the exposed tool catalogue minimal is the key to reliable tool calling.",
+  "how": "Add a 'MCP' tab in SettingsPanel. It lists servers with connected / auth_required / error status, has add and edit forms for stdio or URL servers that write through POST/PATCH, Enable, Disable and Reconnect buttons, and a 'Login' action for OAuth. It never stores secrets in plain text: env_headers and bearer_token_env_var reference environment variables. Each server row has a tool checklist bound to `enabled_tools`, and the tool count is shown against the model's context budget. Ship a one-click 'Godot' preset: `npx @coding-solo/godot-mcp` with GODOT_PATH=F:\\PROJECTS\\godot-hd\\engine\\bin\\godot.windows.editor.x86_64.exe and only run_project, get_debug_output and stop_project enabled. Default to `lazy=true` so a missing Node install does not slow session start. Add a 'Browse registry' dialog that uses the registry tool or a direct call to the registry.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/Hmbown/CodeWhale/blob/main/docs/MCP.md",
+   "/tmp/claude-0/-home-user-LOCAL-AGENT-PROJECT/dfc6ae91-fcd0-5718-90b8-d857a427b4cb/scratchpad/cw-src/crates/tui/src/runtime_api.rs",
+   "https://github.com/Coding-Solo/godot-mcp",
+   "https://github.com/modelcontextprotocol/registry"
+  ]
+ },
+ {
+  "name": "MCP spec 2026-07-28 (stateless, MRTR elicitation) compatibility, and an elicitation UI",
+  "what": "MCP 2026-07-28 is the current stable spec revision. It removes the initialize handshake and sessions and replaces server-initiated elicitation, sampling and roots with Multi Round-Trip Requests (`input_required`). CodeWhale's native MCP client still sends `initialize` at 2025-06-18, and it declares NO client capabilities, so servers can neither elicit input from the user nor talk to modern-only peers.",
+  "how": "(1) Desktop, now: in the MCP tab, show each server's error from /v1/apps/mcp/servers. Detect 'unsupported protocol version' and explain that the server is MCP 2026-07-28-only and needs a newer CodeWhale. (2) Upstream issue or PR to CodeWhale: add a `server/discover` probe and a 2026-07-28 path, declare `elicitation.form`, and forward `input_required` elicitations as a Runtime event and approval-like route. (3) Desktop, after that lands: reuse the existing UserInputCard (src/components/chat/UserInputCard.tsx), which already renders request_user_input questions, to render elicitation forms from the flat primitive schema. Render URL mode as a consent dialog that shows the full URL and domain and opens it in the system browser through tauri-plugin-opener, never in the webview. Ignore the deprecated sampling and roots.",
+  "impact": "medium",
+  "effort": "L",
+  "maturity": "production",
+  "sources": [
+   "https://blog.modelcontextprotocol.io/posts/2026-07-28/",
+   "https://github.com/modelcontextprotocol/modelcontextprotocol/releases",
+   "https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/docs/specification/2026-07-28/changelog.mdx",
+   "https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/docs/specification/2026-07-28/basic/versioning.mdx",
+   "https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/docs/specification/2026-07-28/client/elicitation.mdx"
+  ]
+ },
+ {
+  "name": "Parallel lanes: git worktree isolation and a sub-agent run panel, tuned to one GPU",
+  "what": "CodeWhale sub-agents can run in an isolated git worktree and branch, and their runs can be inspected and cancelled through the Runtime API. The desktop can also start isolated sessions itself by pointing a new thread at a worktree. On one consumer GPU, Ollama serialises requests by default, so parallelism needs explicit UI limits.",
+  "how": "(1) Add 'New isolated session' in the Sidebar. A Tauri command runs `git worktree add <repo>/../.codewhale-worktrees/<repo>/<slug> -b cw/<slug>`, then POST /v1/threads with that workspace. The session list shows the branch and a dirty badge from threads/summary. A 'Merge back / Discard' action uses /v1/git routes or `git worktree remove`. This is ideal for trying two shader approaches side by side. (2) Add a 'Workers' panel that polls GET /v1/agent-runs and the notices, with a Stop button. (3) Add a GPU-aware guard: read OLLAMA_NUM_PARALLEL and VRAM, warn when more than one turn or worker would queue on the same GPU, and default the maximum sub-agent concurrency to 1 for local models.",
+  "impact": "medium",
+  "effort": "M",
+  "maturity": "beta",
+  "sources": [
+   "https://github.com/Hmbown/CodeWhale/blob/main/docs/SUBAGENTS.md",
+   "https://github.com/Hmbown/CodeWhale/blob/main/docs/RUNTIME_API.md",
+   "https://raw.githubusercontent.com/ollama/ollama/main/docs/faq.mdx"
+  ]
+ },
+ {
+  "name": "Hooks: read-only panel and Windows-ready templates (tool_call_before gate, shell_env)",
+  "what": "CodeWhale hooks are shell commands that run at lifecycle events. On Runtime API threads, which is what the desktop drives, four of them fire: tool_call_before (can allow, deny or ask, rewrite input, or add context), shell_env (injects environment variables), tool_call_after and on_error. The Runtime lists the effective hook set and any load problems through a route.",
+  "how": "Add a 'Hooks' section in Settings that renders GET /v1/hooks (source badges global / plugin / project, plus the problems list) with an 'Open config' button. Offer templates written as PowerShell called through `cmd /C powershell -NoProfile -File ...`. (a) A shell_env hook that exports GODOT_BIN=F:\\PROJECTS\\godot-hd\\engine\\bin\\godot.windows.editor.x86_64.exe, so prompts and skills never hard-code the path. (b) A tool_call_before gate that denies `Remove-Item -Recurse`, `format` and `git push --force` outside the workspace, giving a reason the model can read. (c) A tool_call_before hook on write/edit of `*.gdshader` that adds additionalContext reminding the model to run check_shader. Warn in the UI that session-level events (waiting_for_user, session_idle) do not fire on desktop threads; the desktop already gets those states from SSE.",
+  "impact": "medium",
+  "effort": "S",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/Hmbown/CodeWhale/blob/main/docs/HOOKS.md",
+   "https://github.com/Hmbown/CodeWhale/blob/main/docs/RUNTIME_API.md"
+  ]
+ },
+ {
+  "name": "ACP (Agent Client Protocol): CodeWhale in Zed/JetBrains, and optionally the desktop as an ACP client for registry agents",
+  "what": "ACP is a JSON-RPC-over-stdio protocol between editors and coding agents, created by Zed. A shared Zed/JetBrains agent registry launched in January 2026. CodeWhale already ships `codewhale serve --acp` with a narrowed tool profile. The desktop could also speak ACP as a client and become a front-end for other ACP agents that can use Ollama.",
+  "how": "(1) Keep the desktop on `app-server --http`, which is the full API; ACP is the narrower path. (2) Add a Settings card 'Use in Zed/JetBrains' that generates the editor config snippet for `codewhale serve --acp`. Warn that it cannot run at the same time as the desktop sidecar on the same CODEWHALE_HOME, because of the exclusive runtime owner, or offer a separate home directory. (3) Optional, larger: use the Rust `agent-client-protocol` crate in src-tauri to let the desktop launch registry agents such as qwen-code, goose or opencode against the same Ollama. The existing chat, approval and diff UI would render ACP `session/update` and `session/request_permission`, which gives a multi-agent comparison mode. (4) Consider submitting CodeWhale to the ACP registry upstream (it needs `authMethods`).",
+  "impact": "medium",
+  "effort": "L",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/agentclientprotocol/agent-client-protocol",
+   "https://github.com/agentclientprotocol/agent-client-protocol/releases",
+   "https://github.com/agentclientprotocol/registry",
+   "https://blog.jetbrains.com/ai/2026/01/acp-agent-registry/",
+   "https://github.com/Hmbown/CodeWhale/blob/main/docs/RUNTIME_API.md"
+  ]
+ },
+ {
+  "name": "MCP Apps (io.modelcontextprotocol/ui): interactive ui:// views inside the chat",
+  "what": "MCP Apps is an official MCP extension. A tool can declare an HTML UI resource that the host renders in a sandboxed iframe, and the view talks to the host over postMessage JSON-RPC, including calling tools. It would allow rich in-chat UIs such as shader parameter sliders or scene trees. CodeWhale does not support it yet.",
+  "how": "This needs upstream work first. The Runtime must pass `_meta.ui` from MCP tool definitions and results onto tool items, add a resources/read proxy route, and add an app-initiated tools/call route that goes through the normal approval pipeline. Then the desktop renders an `McpAppView` block in src/components/chat/Blocks.tsx: a sandboxed `<iframe sandbox=\"allow-scripts\">` with srcdoc, the CSP built from `_meta.ui.csp`, and a postMessage bridge that logs every view-initiated RPC and asks approval for tools/call. This is a nice-to-have; plan it after the items above.",
+  "impact": "low",
+  "effort": "L",
+  "maturity": "beta",
+  "sources": [
+   "https://raw.githubusercontent.com/modelcontextprotocol/ext-apps/main/specification/2026-01-26/apps.mdx",
+   "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1865",
+   "https://blog.modelcontextprotocol.io/posts/2026-07-28/"
+  ]
+ },
+ {
+  "name": "Windows On-device Agent Registry (ODR): import system-registered MCP servers",
+  "what": "Windows 11 Insider builds include an On-device Agent Registry and an `odr` CLI that lists the locally registered MCP servers, including Windows-provided agent connectors such as File Explorer. A desktop client could discover these and import them into CodeWhale's MCP config.",
+  "how": "In the MCP tab, show an 'Import from Windows' button only when `odr.exe` exists. It runs `odr.exe list` from src-tauri/src/system.rs, parses `mcp_config.command/args`, and offers each entry for POST /v1/apps/mcp/servers with `lazy=true` and a minimal enabled_tools list. Because stable ODR will require MSIX package identity, the Tauri app would need MSIX packaging to keep this working. Treat it as experimental.",
+  "impact": "low",
+  "effort": "S",
+  "maturity": "experimental",
+  "sources": [
+   "https://raw.githubusercontent.com/MicrosoftDocs/windows-ai-docs/docs/docs/mcp/odr-tool.md",
+   "https://raw.githubusercontent.com/MicrosoftDocs/windows-ai-docs/docs/docs/mcp/quickstart-mcp-host.md",
+   "https://learn.microsoft.com/en-us/windows/ai/mcp/overview"
+  ]
+ },
+ {
+  "name": "A2A (Agent2Agent) v1.0: watch only, not needed for a local single-user client",
+  "what": "A2A is the Linux Foundation protocol for agents talking to other agents over HTTP, with Agent Cards, tasks and push notifications. It reached v1.0 in 2026. It is aimed at networked, multi-vendor agent meshes, not at an editor or desktop talking to a local agent, which is the job ACP and the CodeWhale Runtime API already do.",
+  "how": "Do not build anything now. If the user later wants CodeWhale Desktop to delegate to remote or team agents, or to be called by them, the cheapest path is a small A2A adapter in src-tauri that maps an A2A task to POST /v1/threads plus turns and streams SSE back. Revisit only when there is a concrete remote-agent use case.",
+  "impact": "low",
+  "effort": "L",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/a2aproject/A2A/releases",
+   "https://aaif.io/blog/a2a-joins-aaif",
+   "https://www.turingpost.com/p/a2a"
+  ]
+ },
+ {
+  "name": "Tauri 2.12 IPC Channels (plus raw binary invoke) in place of the global `cw-stream` event",
+  "what": "Tauri's `tauri::ipc::Channel<T>` is the official ordered, fast path for streaming from Rust to the webview. Events are the global, JSON-only broadcast system, and the docs say they are not built for high throughput. Raw `InvokeBody::Raw` and `ipc::Response` move binary data such as images and audio without base64 JSON.",
+  "how": "Today src-tauri/src/api.rs `stream_loop` calls `app.emit(\"cw-stream\", ...)` for every SSE event of every thread, and src/lib/tauri.ts `listen(\"cw-stream\")` filters them in JS. Replace this with a command `subscribe_thread(thread_id, since_seq, on_event: Channel<StreamEvent>)`. Rust keeps the reqwest SSE loop, coalesces text deltas into one message every 16–33 ms, and sends them on that thread's channel. Dropping the channel ends the subscription, so there are no leaked listeners when switching threads. Keep `emit` only for low-rate global signals (runtime-status, runtime-log). Change `read_image_b64` and future audio upload to raw bytes: `invoke('attach_image', bytes)` paired with `ipc::Response`. The user sees smoother token streaming and less jank with several threads open.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://v2.tauri.app/develop/calling-frontend/#channels",
+   "https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/develop/calling-frontend.mdx",
+   "https://github.com/tauri-apps/tauri/blob/dev/crates/tauri/src/ipc/channel.rs",
+   "https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/develop/calling-rust.mdx",
+   "https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/blog/tauri-2.12.mdx",
+   "https://www.npmjs.com/package/@tauri-apps/api",
+   "https://crates.io/crates/tauri-specta"
+  ]
+ },
+ {
+  "name": "Local voice input: transcribe-rs (Parakeet v3 / GigaAM-v3 on CPU) with whisper.cpp 1.9.5 as an option",
+  "what": "A Rust crate that runs modern ONNX speech models (NVIDIA Parakeet TDT 0.6B v3, Sber GigaAM-v3, Moonshine, SenseVoice, Canary) and whisper.cpp in-process. Handy, an open-source Tauri 2 dictation app, is a production reference for this whole pipeline: global hold-to-talk shortcut, Silero VAD, transcribe-rs.",
+  "how": "Add a `voice` module in src-tauri: capture audio with cpal (or webview getUserMedia, allowed through the 2.12 `on_permission_request` Microphone handler), run Silero VAD, then `transcribe_rs::onnx::gigaam::GigaAMModel` for Russian with punctuation, or `ParakeetModel` (int8) for mixed RU/EN. Run them on CPU on purpose, so the single NVIDIA GPU's VRAM stays with the Ollama model (GPU Whisper would compete with qwen3/deepseek). Flow: hold a global hotkey or press the mic button in Composer.tsx, see a live waveform, release, and the text is inserted at the caret for editing. Models download on first use into the app-data dir from Settings > Voice, which shows model size. Optionally add a 'voice command' mode that sends immediately.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/cjpais/transcribe-rs",
+   "https://crates.io/crates/transcribe-rs",
+   "https://github.com/salute-developers/GigaAM",
+   "https://github.com/istupakov/onnx-asr",
+   "https://github.com/cjpais/Handy",
+   "https://github.com/ggml-org/whisper.cpp/releases",
+   "https://crates.io/crates/transcribe-cpp",
+   "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3"
+  ]
+ },
+ {
+  "name": "@pierre/diffs 1.5: Shiki-based diff and review renderer with accept/reject hunks",
+  "what": "An Apache-2.0 diff and file rendering library from The Pierre Computer Company. It renders patches or file pairs in split or stacked layout and ships React components, a virtualized multi-file CodeView, a web-worker highlighting pool, line annotations and an accept/reject hunk UI.",
+  "how": "Replace the hand-written parser and renderer in src/components/chat/DiffView.tsx (`parseUnifiedDiff`). Feed the agent's unified patch straight into `<PatchDiff>` inside tool-call blocks, with stacked layout inline and split layout in the Inspector panel. Use `MultiFileDiff`/`CodeView` for a 'Changes in this turn' review pane across files. Wire `DiffAcceptRejectHunkConfig` to CodeWhale's approval flow (approve or deny per hunk where the agent asks). Use annotations to show compile errors from the Godot shader check loop next to the line. It reuses the app's existing Shiki 4.5 themes, and `WorkerPoolContextProvider` keeps large diffs off the UI thread.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://www.npmjs.com/package/@pierre/diffs",
+   "https://diffs.com/docs",
+   "https://newreleases.io/project/github/pierrecomputer/pierre/release/diffs-v1.2.0",
+   "https://github.com/pierrecomputer/pierre"
+  ]
+ },
+ {
+  "name": "Shiki 4.5: @shikijs/stream incremental highlighting plus native gdshader/HLSL/WGSL grammars",
+  "what": "`@shikijs/stream` tokenizes code as it arrives instead of re-highlighting the whole block, and ships a React `ShikiStreamRenderer`. Shiki also bundles real TextMate grammars for Godot's shading language and other shader languages.",
+  "how": "(1) src/lib/highlight.ts maps `gdshader`, `shader` and `hlsl` to `glsl`. Load `shiki/langs/gdshader.mjs` and `hlsl.mjs` directly, so Godot shaders (`shader_type`, `uniform`, `hint_*`, built-ins such as `TEXTURE`, `UV`) highlight correctly. This is a direct quality win for the Godot shader workflow. (2) src/components/chat/CodeBlock.tsx re-highlights the whole block every 250 ms while streaming. For the in-progress block, pipe deltas through `CodeToTokenTransformStream` (allowRecalls: true) or cache `grammarState` per completed line, and switch to the full `codeToHtml` once the fence closes. Long generated files then highlight live without CPU spikes.",
+  "impact": "medium",
+  "effort": "S",
+  "maturity": "production",
+  "sources": [
+   "https://shiki.style/packages/stream",
+   "https://www.npmjs.com/package/@shikijs/stream",
+   "https://shiki.style/guide/grammar-state",
+   "https://github.com/shikijs/textmate-grammars-themes/blob/main/packages/tm-grammars/grammars/gdshader.json",
+   "https://github.com/shikijs/shiki/blob/main/docs/blog/v4.md"
+  ]
+ },
+ {
+  "name": "Embedded terminal: xterm.js 6.0 (WebGL) + portable-pty (ConPTY) over a Channel",
+  "what": "xterm.js is the VS Code terminal emulator. With a Rust pseudo-terminal on Windows ConPTY (via wezterm's portable-pty) it gives a real interactive shell, and can show the agent's command output with full ANSI colors.",
+  "how": "Add a bottom 'Terminal' panel (Ctrl+`) rooted at the thread's workspace, so the user can run `godot --headless --check-only` or git without leaving the app. Implement it in Rust with portable-pty: commands `pty_open(cwd, shell, cols, rows, on_data: Channel<Vec<u8>>)`, `pty_write` and `pty_resize`. Do not use tauri-plugin-pty: it lets the webview spawn arbitrary processes, which breaks the current capability rule in capabilities/default.json that \"Processes are started by Rust, never by the webview\". Load @xterm/addon-webgl and addon-fit. Later, render CodeWhale's shell-tool output in a read-only xterm instance instead of a `<pre>`, so progress bars and colors display correctly.",
+  "impact": "medium",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/xtermjs/xterm.js/releases/tag/6.0.0",
+   "https://www.npmjs.com/package/@xterm/xterm",
+   "https://crates.io/crates/portable-pty",
+   "https://github.com/Tnze/tauri-plugin-pty"
+  ]
+ },
+ {
+  "name": "CodeMirror 6 merge view (not Monaco) for editable diffs and conflict resolution",
+  "what": "For the places where the user must edit before applying, or resolve a conflict, CodeMirror 6's `@codemirror/merge` provides split `MergeView` and inline `unifiedMergeView` with per-chunk accept and reject controls. It is modular and small compared with Monaco.",
+  "how": "Use @pierre/diffs for read-only review, and CodeMirror only for an 'Edit before apply' dialog. When the agent proposes a file change, open `unifiedMergeView({original})` with `mergeControls`, so the user can tweak the agent's patch (for example a .gdshader uniform) and accept per chunk, then Rust writes the result. It can also serve as a lightweight scratch editor for AGENTS.md and skills files. Skip Monaco: its size, web-worker setup and CSP tuning buy nothing here, because the user already has a real editor and the app has open-in-editor.",
+  "impact": "medium",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/codemirror/merge",
+   "https://code.haverbeke.berlin/codemirror/merge/src/branch/main/CHANGELOG.md",
+   "https://www.npmjs.com/package/@codemirror/merge",
+   "https://www.npmjs.com/package/monaco-editor",
+   "https://sourcegraph.com/blog/migrating-monaco-codemirror"
+  ]
+ },
+ {
+  "name": "React Compiler 1.0 through @vitejs/plugin-react 6",
+  "what": "Build-time automatic memoization for React 19 components. It removes most manual memo, useMemo and useCallback work and cuts wasted re-renders during high-frequency streaming updates.",
+  "how": "In vite.config.ts, add `babel({ presets: [reactCompilerPreset()] })`, the stable path. Start with `compilationMode:'annotation'` on hot components (Turn.tsx, Blocks.tsx, Composer.tsx, Inspector.tsx), measure with React DevTools Profiler during a long stream, then switch to full mode. The zustand selectors in store/threads.ts plus the compiler stop sidebar and status-bar re-renders on every token.",
+  "impact": "medium",
+  "effort": "S",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#react-compiler",
+   "https://www.npmjs.com/package/babel-plugin-react-compiler",
+   "https://react.dev/learn/react-compiler"
+  ]
+ },
+ {
+  "name": "Signed auto-updates (tauri-plugin-updater 2.13) and structured logs (tauri-plugin-log 2.10)",
+  "what": "Official in-app updates using minisign-signed artifacts and a static JSON manifest (for example on GitHub Releases), plus a logging plugin that writes Rust and webview logs to rotating files. Together they make a self-distributed Windows app maintainable.",
+  "how": "tauri.conf.json already uses NSIS with `installMode: currentUser`, which fits the passive updater. Publish `latest.json` and signed artifacts from a GitHub Actions release job, and check for updates on startup and from the tray menu ('Update available, restart'). Also bundle the CodeWhale sidecar version in the same release, so app and agent stay compatible. Route the existing `log` crate macros and runtime-log lines through tauri-plugin-log to %APPDATA%. Add a 'Copy diagnostics' action in SettingsPanel that bundles logs, app version, sidecar version, Ollama version and GPU info for bug reports.",
+  "impact": "medium",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://v2.tauri.app/plugin/updater/",
+   "https://github.com/tauri-apps/tauri-docs/blob/v2/src/content/docs/plugin/updater.mdx",
+   "https://v2.tauri.app/plugin/logging/",
+   "https://crates.io/crates/tauri-plugin-updater",
+   "https://crates.io/crates/tauri-plugin-log"
+  ]
+ },
+ {
+  "name": "Local TTS read-back: sherpa-onnx (Rust) with Piper ru_RU voices, or Moonshine Voice streaming TTS",
+  "what": "Offline speech synthesis to read replies or summaries aloud. sherpa-onnx is an Apache-2.0 runtime with official Rust bindings that runs Piper/VITS, Kokoro and Supertonic models. Moonshine Voice adds sentence-level streaming text-in TTS that uses Piper voices, including Russian ones.",
+  "how": "Add an optional 'Read aloud' button on assistant turns and an option to speak only the final summary or approval request (not code). Implement it in Rust with the sherpa-onnx crate and a Piper ru_RU voice for Russian, or Kokoro for English, on CPU so VRAM stays with Ollama. Strip code blocks and tool output before synthesis, chunk by sentence while the stream arrives, and play through rodio or cpal. Do not use Silero because of its non-commercial license. This is nice-to-have and lower priority than voice input.",
+  "impact": "low",
+  "effort": "M",
+  "maturity": "beta",
+  "sources": [
+   "https://github.com/k2-fsa/sherpa-onnx",
+   "https://crates.io/crates/sherpa-onnx",
+   "https://github.com/OHF-Voice/piper1-gpl/blob/main/docs/VOICES.md",
+   "https://github.com/hexgrad/kokoro",
+   "https://github.com/moonshine-ai/moonshine/blob/main/docs/using/text-to-speech.md",
+   "https://github.com/snakers4/silero-models/blob/master/LICENSE"
+  ]
+ },
+ {
+  "name": "GPU telemetry via NVML (nvml-wrapper) + Windows PDH shared-memory counters for sysmem-fallback detection",
+  "what": "Replace spawning nvidia-smi on every poll with in-process NVML through the nvml-wrapper crate. Add the signals that explain slowdowns: power, SM clock, throttle reasons, PCIe. On Windows, add PDH 'GPU Process Memory' counters, because NVML cannot report per-process VRAM under WDDM. Those counters also catch the driver's silent spill of VRAM into system RAM.",
+  "how": "In src-tauri/src/system.rs, replace the per-call nvidia-smi spawn in gpu_stats, which today queries 5 fields with a 4-second timeout, with a lazily initialised Nvml held in Tauri state, and keep nvidia-smi as the fallback. Every 1–2 seconds while a turn runs, emit util, memUtil, VRAM, power in watts, SM clock vs max, temperature and active throttle reasons. Draw sparklines in the GPU panel. Show chips such as 'Thermal throttle' or 'Power cap', plus 'GPU idle while turn is running', which points to a hang or a CPU-bound offload. On Windows, read PDH Shared Usage for the Ollama runner process. If it is above zero while dedicated VRAM is near total, show 'VRAM spilled to system RAM (sysmem fallback): expect 5–10× slower', with a guide to setting 'Prefer No Sysmem Fallback' for ollama.exe and a suggestion to cut num_ctx or the quant. Join decode tok/s with power to show tok/s per watt in the benchmark view.",
+  "impact": "high",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://crates.io/crates/nvml-wrapper",
+   "https://github.com/Cldfire/nvml-wrapper",
+   "https://gist.github.com/sansmoraxz/8a98d987f12d7edc983d611b8326fc67",
+   "https://docs.nvidia.com/deploy/nvml-api/structnvmlProcessInfo__t.html",
+   "https://forums.developer.nvidia.com/t/windows-get-amount-of-shared-vram-used-and-total-from-command-line/302642",
+   "https://support.microsoft.com/help/4490156",
+   "https://crates.io/crates/hypomnesis",
+   "https://docs.cognex.com/deep-learning_400/web/EN/deep-learning/Content/Topics/optimization/gpu-disable-shared.htm"
+  ]
+ },
+ {
+  "name": "Built-in local eval runner: CodeWhale exec over fixture tasks (polyglot exercises + Godot shader suite) with pass@1 / pass^k",
+  "what": "Let users measure which local model and settings actually finish tasks in their own agent, not on a public leaderboard. The runner drives headless `codewhale exec --auto --output-format stream-json` over small fixture tasks, each with a verifier command, and records success, steps, tokens, time, tool errors and loops. Run k times per task to measure reliability.",
+  "how": "Add an 'Evals' screen under src/components/screens. A task pack is a folder of {task.toml: prompt, fixture dir, verify command, timeout}. Bundle (a) about 20 polyglot exercises in Rust and Python as a starter pack (download on demand; keep the Exercism attribution) and (b) a 'Godot shaders' pack whose verify command is the user's existing shader compile-check script. A Rust command in src-tauri/src/runtime.rs copies each fixture to a temp dir and runs the codewhale sidecar binary with exec --auto --output-format stream-json --model <m> and CODEWHALE_MAX_MODEL_STEPS / CODEWHALE_TURN_WALL_CLOCK_SECS caps. It parses the NDJSON for usage and tool errors, runs the verifier, and stores rows in a local SQLite or JSONL file. Results view: a model × task matrix with pass@1, pass^3, median wall time, decode tok/s, loop-watchdog hits, and a 'compare to last run' diff. Include Ollama settings (num_ctx, quant, KV type) in the run key so users can see whether, say, q4_K_M at 16k beats q8_0 at 8k on their own tasks.",
+  "impact": "high",
+  "effort": "L",
+  "maturity": "beta",
+  "sources": [
+   "https://github.com/Hmbown/CodeWhale",
+   "https://github.com/Aider-AI/polyglot-benchmark",
+   "https://github.com/Aider-AI/aider/blob/main/benchmark/README.md",
+   "https://arxiv.org/pdf/2406.12045"
+  ]
+ },
+ {
+  "name": "A/B model comparison inside real threads (fork + per-thread model + Elo leaderboard)",
+  "what": "Add a 'Compare with…' action on any turn. It forks the conversation at that turn, switches the fork to model B, replays the same prompt, and shows both runs side by side with their metrics. The user picks a winner, and wins accumulate into a personal Elo or Bradley-Terry leaderboard per task category. This is the Open WebUI arena pattern applied to a coding agent.",
+  "how": "Add a 'Compare with…' menu item in components/chat/Turn.tsx that calls fork-at-turn on the previous turn, PATCHes the fork's model to B, and re-posts the original prompt. For turns that edit files, create a git worktree for B and pass it as the fork cwd so the two runs never touch the same files. Render a split view with both transcripts and a strip of metrics from item 1 (TTFT, decode tok/s, steps, tokens, files changed, verifier pass if configured). Offer an optional 'blind' mode that hides model names until the user votes. Store votes locally as {category, modelA, modelB, winner, settings}. Show the leaderboard on the Models screen with Elo per category, for example 'godot-shader', 'rust', 'refactor'. Use it to suggest a default model per workspace.",
+  "impact": "medium",
+  "effort": "M",
+  "maturity": "beta",
+  "sources": [
+   "https://github.com/Hmbown/CodeWhale",
+   "https://github.com/open-webui/docs/blob/main/docs/features/administration/evaluation/index.mdx",
+   "https://docs.openwebui.com/features/administration/evaluation/"
+  ]
+ },
+ {
+  "name": "Local tracing with OpenTelemetry GenAI semantic conventions (built-in store + optional OTLP export to Phoenix / otel-desktop-viewer)",
+  "what": "The Desktop already receives every app-server event, so it can emit standard OTel GenAI spans and metrics without any change to CodeWhale. Use one span per turn (invoke_agent), one per model call (chat/inference) and one per tool call (execute_tool). Keep a local trace store by default and offer optional export to a self-hosted viewer.",
+  "how": "In src-tauri, add a tracing module fed by the same SSE event stream that api.rs already proxies. Map turn.started/completed to an invoke_agent span, each turn.usage to a chat span with gen_ai.request.model, gen_ai.usage.* and time_to_first_chunk, and tool item.started/completed/failed to execute_tool spans. Always write them to a local SQLite trace store that powers a 'Timeline' tab: waterfall per turn, slowest tools, tokens per step. Add a Settings toggle 'Export OTLP to…' with a default of http://localhost:6006/v1/traces for Phoenix, plus a 'Launch Phoenix' helper that runs `uvx arize-phoenix serve` when uv is present, or otel-desktop-viewer.exe for a no-Python option. Message content stays off unless the user opts in, matching the convention's Opt-In status for gen_ai.input/output.messages. Do not recommend Langfuse for a single-GPU desktop: it needs ClickHouse, MinIO, Redis and Postgres.",
+  "impact": "medium",
+  "effort": "M",
+  "maturity": "beta",
+  "sources": [
+   "https://github.com/open-telemetry/semantic-conventions-genai",
+   "https://github.com/open-telemetry/semantic-conventions/blob/main/docs/gen-ai/README.md",
+   "https://crates.io/crates/opentelemetry-otlp",
+   "https://github.com/Arize-ai/phoenix",
+   "https://github.com/Arize-ai/phoenix/blob/main/docs/phoenix/release-notes/05-2026/05-15-2026-otel-semconv-conversion.mdx",
+   "https://github.com/CtrlSpice/otel-desktop-viewer",
+   "https://github.com/langfuse/langfuse/blob/main/docker-compose.yml"
+  ]
+ },
+ {
+  "name": "Tool-calling reliability smoke test (BFCL-style categories against CodeWhale's real tool catalog)",
+  "what": "For a coding agent, a local model's value depends mostly on making valid, correct tool calls. Add a short in-app suite modelled on BFCL categories (simple, multiple, parallel, irrelevance, multi-turn) that runs against the exact tool schemas CodeWhale sends. Keep full BFCL as an optional deep benchmark.",
+  "how": "Capture tool_catalog from the latest turn.completed and cache it per CodeWhale version. Ship about 30 prompts: 'read file X' (simple), choose among similar tools (multiple), 'read A and B' (parallel), 'what is 2+2' where no tool is expected (irrelevance), and 3-step chains (multi-turn, with simulated tool results). Send them straight to Ollama /v1/chat/completions with those tools. Score parse-valid JSON, schema-valid arguments, the correct tool, and false-call rate. Show a 'Tool-calling: 87%' badge per model and per num_ctx variant on the Models screen, next to the real-session tool error rate aggregated from item.failed events. Link to an advanced 'Run full BFCL' guide that sets REMOTE_OPENAI_BASE_URL=http://localhost:11434/v1.",
+  "impact": "medium",
+  "effort": "M",
+  "maturity": "beta",
+  "sources": [
+   "https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/CHANGELOG.md",
+   "https://github.com/ShishirPatil/gorilla/tree/main/berkeley-function-call-leaderboard",
+   "https://github.com/Hmbown/CodeWhale",
+   "https://github.com/ollama/ollama/blob/main/openai/openai.go"
+  ]
+ },
+ {
+  "name": "External eval harnesses as optional baselines (promptfoo, Inspect AI, mini-swe-agent + SWE-bench Verified Mini, Harbor/Terminal-Bench 2.0)",
+  "what": "For users who want public-benchmark style numbers or prompt-level A/B matrices, the app can generate configs and launch maintained open-source harnesses against the local Ollama endpoint instead of reimplementing them.",
+  "how": "On the Evals screen, add an 'Export' tab. 'Prompt matrix (promptfoo)' writes promptfooconfig.yaml with one ollama:chat:<model> provider per selected installed model (with num_ctx and think taken from the variant) and the user's saved prompts as tests, then launches `npx promptfoo@latest eval` and `promptfoo view` in a terminal. 'SWE-bench Verified Mini (mini-swe-agent)' writes the LiteLLM registry JSON and the command line, and warns about the Docker Desktop/WSL2 and disk requirements. 'Inspect' exports `--model ollama/<model>`. These are explicitly secondary to the built-in runner (item 5), which tests the actual CodeWhale agent. Treat them as external baselines and import their result files into the same results matrix when possible.",
+  "impact": "medium",
+  "effort": "M",
+  "maturity": "production",
+  "sources": [
+   "https://github.com/promptfoo/promptfoo/blob/main/site/docs/providers/ollama.md",
+   "https://github.com/promptfoo/promptfoo/releases",
+   "https://qaskills.sh/blog/openai-promptfoo-acquisition-explained-2026",
+   "https://github.com/UKGovernmentBEIS/inspect_ai/blob/main/docs/providers.qmd",
+   "https://github.com/SWE-agent/mini-swe-agent",
+   "https://github.com/intel/neural-compressor/pull/2563",
+   "https://github.com/laude-institute/harbor",
+   "https://github.com/Aider-AI/aider/blob/main/benchmark/README.md"
+  ]
+ }
+]

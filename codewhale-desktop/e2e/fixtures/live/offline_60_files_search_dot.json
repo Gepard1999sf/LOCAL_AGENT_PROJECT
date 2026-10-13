@@ -1,0 +1,25 @@
+{
+  "endpoint": "GET /v1/workspace/files/search",
+  "phase": "offline",
+  "request": {
+    "method": "GET",
+    "path": "/v1/workspace/files/search?query=.&limit=60",
+    "auth": true,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "paths": [
+        ".codewhale/state/.gitignore",
+        ".codewhale/state/subagents.v1.lock",
+        "README.md",
+        "hello.txt",
+        "src/main.rs"
+      ]
+    }
+  },
+  "elapsed_ms": 2,
+  "recorded_at": "2026-10-13T21:29:08+00:00"
+}

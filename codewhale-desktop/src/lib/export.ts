@@ -1,15 +1,16 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { api } from "./tauri";
-import { useThreads } from "../store/threads";
+import { threadViewFromDetail, useThreads, type ThreadView } from "../store/threads";
 import { useApp } from "../store/app";
+import type { ThreadDetail } from "./types";
 
 function safeName(s: string) {
   return (s || "session").replace(/[\\/:*?"<>|\r\n]+/g, " ").trim().slice(0, 60) || "session";
 }
 
-export function threadToMarkdown(threadId: string): string {
-  const t = useThreads.getState().threads[threadId];
+export function threadToMarkdown(threadId: string, view?: ThreadView): string {
+  const t = view ?? useThreads.getState().threads[threadId];
   const summary = useApp.getState().summaries.find((s) => s.id === threadId);
   if (!t) return "";
   const lines: string[] = [];
@@ -34,6 +35,15 @@ export function threadToMarkdown(threadId: string): string {
         if (a) lines.push(`> Подтверждение \`${a.toolName ?? "tool"}\`: ${a.status}`, "");
         continue;
       }
+      if (id.startsWith("input:")) {
+        const u = t.userInputs[id.slice(6)];
+        if (!u) continue;
+        for (const q of u.questions) {
+          const ans = u.answers?.filter((a) => a.id === q.id).map((a) => a.value) ?? [];
+          lines.push(`> ❓ ${q.question}`, `> → ${ans.length ? ans.join(", ") : u.status}`, "");
+        }
+        continue;
+      }
       const it = t.items[id];
       if (!it) continue;
       const text = it.text || it.detail;
@@ -55,6 +65,26 @@ export function threadToJson(threadId: string): string {
   return JSON.stringify(t ?? {}, null, 2);
 }
 
+/**
+ * Complete export data for a thread, independent of whether (and how far) its event
+ * stream was replayed: the stream replays a bounded tail, GET /v1/threads/{id} does not.
+ * The loaded view is preferred when it holds everything, since it also carries
+ * decided approvals and answers given in this window.
+ */
+export async function loadThreadForExport(threadId: string): Promise<{ view?: ThreadView; detail?: ThreadDetail }> {
+  const local = useThreads.getState().threads[threadId];
+  let detail: ThreadDetail | undefined;
+  try {
+    detail = await api.request<ThreadDetail>("GET", `/v1/threads/${threadId}`);
+  } catch (e) {
+    if (!local) throw e;
+  }
+  if (!detail) return { view: local };
+  const complete =
+    local?.live && local.turns.length >= detail.turns.length && Object.keys(local.items).length >= detail.items.length;
+  return { view: complete ? local : threadViewFromDetail(detail), detail };
+}
+
 export async function exportThread(threadId: string, format: "md" | "json") {
   const summary = useApp.getState().summaries.find((s) => s.id === threadId);
   const path = await save({
@@ -64,7 +94,10 @@ export async function exportThread(threadId: string, format: "md" | "json") {
   });
   if (!path) return;
   try {
-    await api.writeExport(path, format === "md" ? threadToMarkdown(threadId) : threadToJson(threadId));
+    const { view, detail } = await loadThreadForExport(threadId);
+    const content =
+      format === "md" ? threadToMarkdown(threadId, view) : JSON.stringify(detail ?? view ?? {}, null, 2);
+    await api.writeExport(path, content);
     toast.success("Сессия экспортирована", { description: path });
   } catch (e) {
     toast.error("Экспорт не удался", { description: String(e) });

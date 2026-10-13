@@ -1,0 +1,266 @@
+{
+ "endpoints": [
+  {
+   "method": "GET",
+   "path": "/health",
+   "client_sites": "src-tauri/src/runtime.rs:216 (startup poll every 200ms, 30s deadline runtime.rs:201,222); also whitelisted for cw_request at src-tauri/src/api.rs:40",
+   "server_handler": "crates/tui/src/runtime_api.rs:2842 -> health() runtime_api.rs:3063-3069 (unauthenticated: registered on the outer Router, outside the token route_layer at runtime_api.rs:2811-2818)",
+   "request_match": "ok (no auth needed; runtime.rs:216 sends none)",
+   "response_match": "ok; client only checks 2xx (runtime.rs:217). Body is {status:\"ok\",service,mode} (HealthResponse runtime_api.rs:930-935)",
+   "severity": "ok"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/runtime/info",
+   "client_sites": "src-tauri/src/runtime.rs:234-241",
+   "server_handler": "crates/tui/src/runtime_api.rs:2848 -> runtime_info() runtime_api.rs:5830-5855 (deliberately unauthenticated, comment runtime_api.rs:2845-2847; account info redacted when unauthorized runtime_api.rs:5837-5841)",
+   "request_match": "ok; no bearer is sent (runtime.rs:234) and none is required",
+   "response_match": "ok; client reads codewhale_version (runtime.rs:239) = RuntimeInfoResponse.codewhale_version runtime_api.rs:1222 (snake_case, no rename). Minor robustness gap: this request has no .timeout() (runtime.rs:234), only the 5s connect_timeout (runtime.rs:56)",
+   "severity": "ok"
+  },
+  {
+   "method": "ANY",
+   "path": "/v1/* (auth + error envelope)",
+   "client_sites": "src-tauri/src/api.rs:63-67 (.bearer_auth(token)), api.rs:135 (SSE), token generated runtime.rs:284-288 and passed via env runtime.rs:161; error parsing api.rs:75-81",
+   "server_handler": "require_runtime_token crates/tui/src/runtime_api/auth.rs:68-86 -> request_has_header_runtime_token auth.rs:138-154 (strip_prefix(\"Bearer \") + constant_time_eq; also accepts x-codewhale-runtime-token / x-deepseek-runtime-token). Token source: runtime_token_environment runtime_api.rs:144,154-171 read at runtime_api.rs:1901-1906 -> resolve_runtime_auth auth.rs:17-28. app-server --http forwards to `serve --http --host --port` (crates/cli/src/lib.rs:6266-6276, run_app_server_command lib.rs:6211-6250); CODEWHALE_APP_SERVER_TOKEN is only consulted for the legacy transport (lib.rs:6239-6241,6307-6311). ApiError envelope runtime_api.rs:12865-12887; 401 body auth.rs:287-297",
+   "request_match": "ok: reqwest bearer_auth emits `Authorization: Bearer <64 hex>` which matches auth.rs:140-143; env var name CODEWHALE_RUNTIME_TOKEN matches runtime_api.rs:144",
+   "response_match": "ok: api.rs:77 reads /error/message which matches {\"error\":{\"message\",\"status\"[,\"code\"]}} (runtime_api.rs:12869-12883, auth.rs:290-295). Only exceptions are non-ApiError bodies (axum Json/Query rejections are plain text; watch-token 403 is {\"error\":\"<string>\"} auth.rs:78-81) where api.rs:80 falls back to raw text - harmless",
+   "severity": "ok"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/threads/summary?limit=300",
+   "client_sites": "src/store/app.ts:137 (result consumed app.ts:140-141; fields read in src/components/layout/Sidebar.tsx:81,112,162,165-168,172-174,251,260; src/components/chat/ChatArea.tsx:64,75-77; src/components/screens/EmptyState.tsx:50)",
+   "server_handler": "crates/tui/src/runtime_api.rs:2478 -> list_threads_summary runtime_api.rs:3207-3372; ThreadSummaryQuery runtime_api.rs:963-974; ThreadSummary runtime_api.rs:989-1007",
+   "request_match": "ok: `limit` is a valid snake_case query key (runtime_api.rs:964), clamped 1..=500 (runtime_api.rs:3211). Default filter is ActiveOnly (runtime_api.rs:976-986), so the client's `!s.archived` filter (app.ts:141) is redundant but harmless",
+   "response_match": "Array of ThreadSummary; all field names match src/lib/types.ts:32-47. MISMATCH: latest_turn_status is `format!(\"{:?}\", status).to_ascii_lowercase()` (crates/tui/src/runtime_threads.rs:10481-10482, documented as Debug-lowercased at runtime_threads.rs:5457), so an in-progress turn is \"inprogress\" (enum InProgress runtime_threads.rs:760-767), not \"in_progress\". Sidebar.tsx:81 compares to \"in_progress\" and never matches, so threads not currently subscribed never show as running (\"queued\" is also ignored)",
+   "severity": "minor"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/threads/summary?limit=100&search=<q>",
+   "client_sites": "src/components/layout/Sidebar.tsx:227",
+   "server_handler": "crates/tui/src/runtime_api.rs:2478 -> list_threads_summary runtime_api.rs:3207 (search lowercased runtime_api.rs:3212, full scan when searching runtime_api.rs:3243-3247)",
+   "request_match": "ok: `search` and `limit` exist in ThreadSummaryQuery runtime_api.rs:963-966; value is URL-encoded (Sidebar.tsx:227)",
+   "response_match": "same as above: fields ok, latest_turn_status casing mismatch (runtime_threads.rs:10481-10482 vs Sidebar.tsx:81)",
+   "severity": "minor"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sessions?limit=50",
+   "client_sites": "src/store/app.ts:138 (consumed app.ts:142; fields read Sidebar.tsx:357)",
+   "server_handler": "crates/tui/src/runtime_api.rs:2367-2372 -> list_sessions crates/tui/src/runtime_api/sessions.rs:153-169; SessionsQuery sessions.rs:69-86; SessionsResponse sessions.rs:25-27; SessionMetadata crates/tui/src/session_manager.rs:358-389",
+   "request_match": "ok: `limit` (sessions.rs:70), clamped 1..=500 (sessions.rs:146)",
+   "response_match": "ok: {sessions:[SessionMetadata]}; id,title,created_at,updated_at,message_count,total_tokens,model,workspace (session_manager.rs:360-386) all match SavedSession src/lib/types.ts:167-176",
+   "severity": "ok"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/threads/{id}/context",
+   "client_sites": "src/store/app.ts:153 (fields read src/components/layout/Inspector.tsx:153-156,191-193; src/components/layout/StatusBar.tsx:53-54; src/components/chat/ChatArea.tsx:67)",
+   "server_handler": "crates/tui/src/runtime_api.rs:2527 -> context::get_thread_context crates/tui/src/runtime_api/context.rs:36-96; ThreadContextResponse context.rs:17-34",
+   "request_match": "ok (no body/query)",
+   "response_match": "Field names match ContextInfo src/lib/types.ts:97-111. Type drift: `provider` is Option<String> (context.rs:20) and `pressure` is Option<&str> (context.rs:33, null whenever the engine is not loaded context.rs:80-94) but TS declares both non-null string; `model_provider_id` (context.rs:21) is missing from the TS type. Client tolerates null via ?? (Inspector.tsx:193). Pressure values are low/moderate/high/critical (crates/runtime/src/context_budget.rs:113-120); Inspector.tsx:193 only warns on \"high\", not \"critical\"",
+   "severity": "minor"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/threads",
+   "client_sites": "src/store/app.ts:179-198 (body built app.ts:181-185, reads thread.id app.ts:188-189)",
+   "server_handler": "crates/tui/src/runtime_api.rs:2477 -> create_thread runtime_api.rs:3108-3129 -> create_thread_with_reserved_id crates/tui/src/runtime_threads.rs:10185-10287; CreateThreadRequest runtime_threads.rs:4902-4934",
+   "request_match": "ok: model_provider, model, workspace, allowed_tools are all snake_case fields of CreateThreadRequest (runtime_threads.rs:4903-4917); no deny_unknown_fields. \"ollama\" is a valid ProviderKind (crates/config/src/tests.rs:4569) resolved via resolve_persisted_provider_identity (runtime_threads.rs:10203-10208). Forward-slash workspace (app.ts:184) is accepted as PathBuf (runtime_threads.rs:10227)",
+   "response_match": "ok: 201 + ThreadRecord (runtime_api.rs:3128); client reads only `id` (runtime_threads.rs:805)",
+   "severity": "ok"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/threads/{id}/turns",
+   "client_sites": "src/store/app.ts:201-219 (body app.ts:206-211); images from src/components/composer/Composer.tsx:212",
+   "server_handler": "crates/tui/src/runtime_api.rs:2571-2576 (8 MB body limit, crates/protocol/src/runtime/mod.rs:11) -> start_thread_turn runtime_api.rs:8462-8494; StartTurnRequest crates/tui/src/runtime_threads.rs:4969-5034; RuntimeImageInput crates/protocol/src/runtime/mod.rs:17-22",
+   "request_match": "ok: prompt (runtime_threads.rs:4990), operation_key (4995-4996, alias operationKey; <=128 bytes, no whitespace/control chars runtime_threads.rs:76,5120-5132 - client key `desk-<ms>-<6 chars>` complies), allowed_tools (5006). Images: server is camelCase + deny_unknown_fields {mime,dataBase64} (mod.rs:18-22); client sends exactly {mime,dataBase64} after stripping `name` (Composer.tsx:212) - matches. Note: a fresh operation_key per call (app.ts:208) means server-side idempotent replay (runtime_api.rs:8477-8484) never helps a client retry",
+   "response_match": "ok: response StartTurnResponse {thread,turn,idempotent_replay?} (runtime_api.rs:1565-1574) is not read by the client",
+   "severity": "ok"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/threads/{id}/turns/{turn_id}/interrupt",
+   "client_sites": "src/store/app.ts:221-232 (turnId from activeTurnId set at src/store/threads.ts:232)",
+   "server_handler": "crates/tui/src/runtime_api.rs:2596-2599 -> interrupt_thread_turn runtime_api.rs:8622-8632",
+   "request_match": "ok: handler has no Json extractor, the `{}` body is ignored",
+   "response_match": "ok: TurnRecord not read. Caveat: depends on turn.started having been seen in the event stream (see events row - tail replay can drop it)",
+   "severity": "ok"
+  },
+  {
+   "method": "PATCH",
+   "path": "/v1/threads/{id} {model, model_provider}",
+   "client_sites": "src/store/app.ts:239",
+   "server_handler": "crates/tui/src/runtime_api.rs:2485 -> update_thread runtime_api.rs:7406-7421; UpdateThreadRequest crates/tui/src/runtime_threads.rs:4942-4967",
+   "request_match": "ok: `model` (4947) and `model_provider` (4959-4960) exist, snake_case",
+   "response_match": "ok: ThreadRecord not read",
+   "severity": "ok"
+  },
+  {
+   "method": "PATCH",
+   "path": "/v1/threads/{id} {title}",
+   "client_sites": "src/store/app.ts:251",
+   "server_handler": "crates/tui/src/runtime_api.rs:2485 -> update_thread runtime_api.rs:7406; UpdateThreadRequest.title runtime_threads.rs:4950",
+   "request_match": "ok",
+   "response_match": "ok (not read)",
+   "severity": "ok"
+  },
+  {
+   "method": "PATCH",
+   "path": "/v1/threads/{id} {archived:true}",
+   "client_sites": "src/store/app.ts:260",
+   "server_handler": "crates/tui/src/runtime_api.rs:2485 -> update_thread runtime_api.rs:7406; UpdateThreadRequest.archived runtime_threads.rs:4943",
+   "request_match": "ok",
+   "response_match": "ok (not read)",
+   "severity": "ok"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/threads/{id}/fork",
+   "client_sites": "src/store/app.ts:272-273",
+   "server_handler": "crates/tui/src/runtime_api.rs:2561 -> fork_thread runtime_api.rs:7436-7446",
+   "request_match": "ok: no Json extractor, `{}` ignored",
+   "response_match": "ok: 201 + bare ThreadRecord; client tries res.thread?.id then res.id (app.ts:273) - res.id matches runtime_threads.rs:805",
+   "severity": "ok"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sessions/{id}/resume-thread",
+   "client_sites": "src/store/app.ts:284-285",
+   "server_handler": "crates/tui/src/runtime_api.rs:2379-2382 -> resume_session_thread crates/tui/src/runtime_api/sessions.rs:351-367 -> resume_session_in_runtime sessions.rs:369-489; ResumeSessionRequest sessions.rs:55-58",
+   "request_match": "ok: `{}` deserializes (model/mode are Option)",
+   "response_match": "ok: ResumeSessionResponse {thread_id,session_id,message_count,summary} (sessions.rs:61-66); client's third fallback res.thread_id (app.ts:285) matches. 200 when already open (sessions.rs:421-429), 201 when new (sessions.rs:483-489). Behavioural note: a new thread reuses the saved session's model/model_provider (sessions.rs:431,441-445), not ollama",
+   "severity": "ok"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/approvals/{approval_id}",
+   "client_sites": "src/store/app.ts:312 (manual) and src/hooks/useBootstrap.ts:28 (auto-approve); approval id from approval.required payload src/store/threads.ts:298, useBootstrap.ts:25",
+   "server_handler": "crates/tui/src/runtime_api.rs:2636 -> decide_approval runtime_api.rs:5742-5772; DecideApprovalBody runtime_api.rs:1185-1190",
+   "request_match": "ok: {decision:\"allow\"|\"deny\", remember:bool} exactly as parsed at runtime_api.rs:5747-5758; approval_id is the runtime-minted id emitted as payload.approval_id/id (crates/tui/src/runtime_threads.rs:17976-17986)",
+   "response_match": "ok: DecideApprovalResponse not read; 404 when no longer pending (runtime_api.rs:5762-5765) surfaces as toast",
+   "severity": "ok"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/threads/{id}/compact",
+   "client_sites": "src/components/composer/Composer.tsx:110; src/components/layout/Inspector.tsx:212; src/components/overlays/CommandPalette.tsx:107; src/components/chat/ChatArea.tsx:114",
+   "server_handler": "crates/tui/src/runtime_api.rs:2604 -> compact_thread runtime_api.rs:8658-8680; CompactThreadRequest crates/tui/src/runtime_threads.rs:5278-5281",
+   "request_match": "ok: Json<CompactThreadRequest> requires a JSON body; client always sends `{}` with application/json (api.rs:68-69), reason is optional",
+   "response_match": "ok: 202 + StartTurnResponse, not read",
+   "severity": "ok"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/workspace/files/search?query=<q>&limit=60",
+   "client_sites": "src/components/composer/Composer.tsx:171-176",
+   "server_handler": "crates/tui/src/runtime_api.rs:2398 -> workspace_file_search crates/tui/src/runtime_api/workspace.rs:30-52; WorkspaceFileSearchQuery workspace.rs:16-22 (deny_unknown_fields)",
+   "request_match": "ok: only `query` and `limit` sent, both declared; limit 60 within 1..=100 (workspace.rs:40-42); client substitutes \".\" for empty q (Composer.tsx:173) which avoids the empty-result short-circuit (workspace.rs:44-46)",
+   "response_match": "ok: {paths:[string]} (workspace.rs:25-27). Minor: server keeps only regular files (workspace.rs:80), so the directory branch Composer.tsx:181 never triggers; search is rooted at the server's own workspace (workspace.rs:48), consistent with the restart in app.ts:299-301",
+   "severity": "ok"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/usage?group_by=day",
+   "client_sites": "src/components/overlays/SidePanels.tsx:108 (reads totals.turns/input_tokens/output_tokens/cached_tokens SidePanels.tsx:120-123; buckets[].key/turns/input_tokens/output_tokens SidePanels.tsx:142-150)",
+   "server_handler": "crates/tui/src/runtime_api.rs:2764 -> get_usage runtime_api.rs:10111-10146; UsageQuery runtime_api.rs:10096-10103; UsageAggregation crates/tui/src/runtime_threads.rs:5526-5532",
+   "request_match": "ok: group_by=day is accepted (runtime_api.rs:10128-10129)",
+   "response_match": "Field names all match (UsageTotals runtime_threads.rs:5387-5425, UsageBucket runtime_threads.rs:5493-5522). Semantic drift: `turns` counts provider-call usage records incl. child/compaction calls (runtime_threads.rs:5423-5425, 5521-5522), so the \"Ходов\" tiles over-count user turns",
+   "severity": "minor"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/threads/{id}",
+   "client_sites": "src/components/overlays/SettingsPanel.tsx:64 (export-all; JSON dumped verbatim)",
+   "server_handler": "crates/tui/src/runtime_api.rs:2485 -> get_thread runtime_api.rs:7328-7338; ThreadDetail crates/tui/src/runtime_threads.rs:5284-5309",
+   "request_match": "ok",
+   "response_match": "ok: no fields read. Note: this snapshot (turns, items, latest_seq, pending_approvals) is never used to hydrate a thread view, though it is the server's intended starting point for an event cursor (runtime_threads.rs:5286-5293)",
+   "severity": "ok"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/threads/{id}/events?replay_limit=4096&progress=true&since_seq=N (SSE)",
+   "client_sites": "src-tauri/src/api.rs:129-135 (request), api.rs:158-191 (frame loop), api.rs:209-233 (parse_frame); consumed in src/store/threads.ts:211-354, src/hooks/useBootstrap.ts:9-43",
+   "server_handler": "crates/tui/src/runtime_api.rs:2611 -> stream_thread_events runtime_api.rs:9052-9118; ThreadEventsQuery runtime_api.rs:1510-1515; frame builders thread_stream_progress runtime_api.rs:9124-9135, thread_stream_end runtime_api.rs:9174-9184, thread_journal_frame runtime_api.rs:9188-9206, envelope runtime_api.rs:9675-9704, sse_json runtime_api.rs:9907-9910",
+   "request_match": "ok: since_seq, replay_limit, progress are the exact snake_case keys (runtime_api.rs:1511-1514); replay_limit 4096 equals the max MAX_RUNTIME_EVENT_REPLAY_TAIL (crates/tui/src/runtime_threads.rs:75, checked runtime_api.rs:9076-9083); bearer sent api.rs:135. BUT replay_limit is a tail limit: publish_tail_event_replay keeps only the newest 4096 events after since_seq and drops the rest (runtime_threads.rs:4450-4481), and every item.delta chunk is persisted (runtime_threads.rs:16850-16857 via emit_event 9664-9675). So opening a long thread from since_seq=0 (app.ts:173,189), or reconnecting after a long gap, silently loses early turn.started/item.started frames. The client ignores `previous_seq` (runtime_api.rs:9695-9703), the only gap signal",
+   "response_match": "Journal frames are `event:<name>` + `id:<seq>` + `data:<RuntimeEventEnvelope>` with payload under `.payload` (crates/protocol/src/runtime/mod.rs:24-41), and parse_frame handles them. MISMATCH 1: the stream.progress frame is NOT an envelope; `state` is top level and there is no `payload` key (runtime_api.rs:9124-9135), but threads.ts:212,217-218 reads ev.payload.state, so `t.live` is never set. Effects: src/hooks/useBootstrap.ts:17 returns early, so auto-approve rules never fire; src/components/chat/MessageList.tsx:75 shows a skeleton forever on a new or empty thread. MISMATCH 2: the runtime emits only `turn.completed` for terminal turns, with turn.status failed/interrupted/canceled (emit_turn_completed_if_missing runtime_threads.rs:9703-9731, called at 18712); turn.failed/turn.interrupted exist only in exec_agent.rs:1282-1283. So threads.ts:234 (lastError) and useBootstrap.ts:34-35 are dead; the error text still arrives in turn.error (runtime_threads.rs:1636) through mergeTurnRecord (threads.ts:149). Other payload keys read by the client match: approval.required approval_id/tool_call_id/tool_name (runtime_threads.rs:17976-17986); approval.decided decision/cancelled/timeout (runtime_threads.rs:18062-18070, 18124-18130, 18185-18193); turn.usage usage/duration_ms/first_token_ms (runtime_threads.rs:18386-18391); turn.lifecycle status (runtime_threads.rs:16779-16781); item.delta delta/kind (runtime_threads.rs:16855-16856); item metadata tool_use_id/tool_input/visibility (runtime_threads.rs:16980-16999, 19544); turn.workspace_snapshot changed_paths (crates/tui/src/snapshot/mod.rs:133); item kinds and status are snake_case (runtime_threads.rs:776-799)",
+   "severity": "major"
+  }
+ ],
+ "notes": "Scope: every runtime HTTP call in the desktop client. 18 api.request call sites (grep of src: app.ts x12, Composer.tsx x2, Inspector.tsx, CommandPalette.tsx, ChatArea.tsx, SidePanels.tsx, SettingsPanel.tsx, Sidebar.tsx), plus the Rust-side direct calls /health (runtime.rs:216), /v1/runtime/info (runtime.rs:234) and the SSE stream (api.rs:129). ollama.rs and system.rs only talk to Ollama (/api/version, /api/ps, /api/tags, /api/show, /api/create, /api/generate at ollama.rs:38-162), never the runtime. No fetch/EventSource exists in src. No files were edited.\n\nOverall: request field names and casing match the server on every endpoint. All snake_case, except image inputs, which are camelCase {mime,dataBase64} with deny_unknown_fields (protocol/src/runtime/mod.rs:17-22). The client matches that exactly after Composer.tsx:212 strips `name`. Auth is also correct: Bearer header and env var name match (api.rs:66 vs runtime_api/auth.rs:138-143; runtime.rs:161 vs runtime_api.rs:144,1901-1906). The error envelope /error/message matches too (api.rs:77 vs runtime_api.rs:12865-12887). So nothing is \"broken\" at the wire level.\n\nReal defects, in priority order:\n1. MAJOR (threads.ts:217-218): stream.progress has `state` at the top level (runtime_api.rs:9124-9135), not under `payload`, so ThreadView.live is never true. Auto-approve is fully dead (useBootstrap.ts:17), and a new or empty thread renders a skeleton forever (MessageList.tsx:75). Fix: read ev.state for this event (or (ev as any).payload?.state ?? (ev as any).state).\n2. MAJOR (api.rs:129): replay_limit=4096 means \"last 4096 events\", not \"batch size\" (runtime_threads.rs:4450-4481), and per-token item.delta events are persisted, so history of long threads is silently truncated on open. Suggested fix: GET /v1/threads/{id} (ThreadDetail: turns, items, pending_approvals, latest_seq; runtime_threads.rs:5284-5309), hydrate the store, then subscribe with since_seq=latest_seq and no replay_limit. Alternatively, drop replay_limit, or detect gaps via previous_seq.\n3. MINOR: latest_turn_status is Debug-lowercased (\"inprogress\", runtime_threads.rs:10481-10482), but Sidebar.tsx:81 checks \"in_progress\". Compare against \"inprogress\"/\"queued\", or normalize by removing underscores.\n4. MINOR: the runtime never emits turn.failed/turn.interrupted/turn.canceled; everything is turn.completed plus turn.status (runtime_threads.rs:9703-9731, 18712). Derive lastError from p.turn.status===\"failed\" on turn.completed.\n5. MINOR (perf): useBootstrap.ts:33-38 calls refreshThreads and refreshContext on every replayed turn.completed. Opening a thread with N turns fires about 3N requests, and each summary call spawns git processes (runtime_api.rs:3290-3305). Gate it on t.live (after fix 1) or debounce it.\n6. MINOR: in ContextInfo (types.ts:97-111), provider/pressure are typed non-null but can be null (context.rs:20,33,80-94), and model_provider_id is missing. Inspector.tsx:193 should also warn on \"critical\" (context_budget.rs:118-120).\n7. MINOR: /v1/usage `turns` counts provider calls, not user turns (runtime_threads.rs:5423-5425).\n8. Cosmetic: the file search returns files only (workspace.rs:80), so the dir icon at Composer.tsx:181 never appears. operation_key is regenerated per call (app.ts:208), so idempotent retry (runtime_api.rs:8477-8484) is never used.\n\nStartup/process facts:\n- `app-server --http --host --port` is forwarded to `serve --http --host --port` (cli/src/lib.rs:6266-6276). The default port would be 7878 (lib.rs:6227-6235), but the client always passes a free port.\n- If an owner runtime is already published (e.g. a TUI started from PowerShell), the new process attaches as a listener frontend of that owner instead of opening its own store (runtime_api.rs:1766-1835). Same HTTP contract, but threads and workspace are the owner's.\n- Upstream has no `codewhale-app-server` binary: crates/app-server is a library (Cargo.toml:2), and the only bin is `codewhale` (crates/cli/Cargo.toml:22-23). The externalBin binaries/codewhale-app-server (src-tauri/tauri.conf.json:34) must therefore be a renamed `codewhale` binary. That works, because runtime.rs:159 passes the `app-server` subcommand.\n- /health and /v1/runtime/info are intentionally unauthenticated (runtime_api.rs:2842-2848). /v1/runtime/info has no request timeout (runtime.rs:234).",
+ "flagged_verified": [
+  {
+   "method": "GET",
+   "path": "/v1/threads/summary?limit=300",
+   "client_sites": "src/store/app.ts:137 (result consumed app.ts:140-141; fields read in src/components/layout/Sidebar.tsx:81,112,162,165-168,172-174,251,260; src/components/chat/ChatArea.tsx:64,75-77; src/components/screens/EmptyState.tsx:50)",
+   "server_handler": "crates/tui/src/runtime_api.rs:2478 -> list_threads_summary runtime_api.rs:3207-3372; ThreadSummaryQuery runtime_api.rs:963-974; ThreadSummary runtime_api.rs:989-1007",
+   "request_match": "ok: `limit` is a valid snake_case query key (runtime_api.rs:964), clamped 1..=500 (runtime_api.rs:3211). Default filter is ActiveOnly (runtime_api.rs:976-986), so the client's `!s.archived` filter (app.ts:141) is redundant but harmless",
+   "response_match": "Array of ThreadSummary; all field names match src/lib/types.ts:32-47. MISMATCH: latest_turn_status is `format!(\"{:?}\", status).to_ascii_lowercase()` (crates/tui/src/runtime_threads.rs:10481-10482, documented as Debug-lowercased at runtime_threads.rs:5457), so an in-progress turn is \"inprogress\" (enum InProgress runtime_threads.rs:760-767), not \"in_progress\". Sidebar.tsx:81 compares to \"in_progress\" and never matches, so threads not currently subscribed never show as running (\"queued\" is also ignored)",
+   "severity": "minor",
+   "verdict": {
+    "refuted": false,
+    "evidence": "The claim holds. I could not refute it.\n\nRequest side:\n- The client sends GET /v1/threads/summary?limit=300 (src/store/app.ts:137) and filters `!s.archived` (app.ts:141). This works.\n- All field names in the TS ThreadSummary (src/lib/types.ts:32-47) match the server struct ThreadSummary (cw-src/crates/tui/src/runtime_api.rs:988-1007).\n- The server struct is a plain `#[derive(Serialize)]` with no rename, so its keys are snake_case.\n\nResponse side, where the mismatch is:\n- In the summary handler, `latest_turn_status` is copied unchanged from `facts.latest_turn_status` (runtime_api.rs:3321, 3366). Nothing in the handler normalizes it.\n- That fact is built at cw-src/crates/tui/src/runtime_threads.rs:10481-10482 as `format!(\"{:?}\", turn.status).to_ascii_lowercase()`.\n- `turn.status` has type RuntimeTurnStatus (runtime_threads.rs:1491). That enum is `#[serde(rename_all = \"snake_case\")]` with variants Queued and InProgress (runtime_threads.rs:758-767).\n- serde's rename only affects serialization. The code here uses Debug formatting, which prints the Rust variant name \"InProgress\", and lowercasing gives \"inprogress\", not \"in_progress\". The field's doc comment confirms the format: \"`Debug`-lowercased for the wire\" (runtime_threads.rs:5457).\n- Upstream's own web client handles both spellings at cw-src/crates/tui/src/runtime_web/app.mjs:1148: `summary.latest_turn_status === \"inprogress\" || summary.latest_turn_status === \"in_progress\"`. This shows \"inprogress\" is what the server actually sends.\n\nClient effect:\n- src/components/layout/Sidebar.tsx:81 checks only `s.latest_turn_status === \"in_progress\"`. This is the only client read of the field (grep finds only Sidebar.tsx:81 and types.ts:45).\n- So the server's running signal never matches. A thread shows as running only if it is subscribed locally and has a local `activeTurnId`. A thread that is running but not open, or one that resumed after the app restarted, shows as idle.\n- Queued turns (\"queued\", from RuntimeTurnStatus::Queued, runtime_threads.rs:760) are also never treated as running. Upstream marks Queued as active work (`is_active_work`, runtime_threads.rs:769-773).\n\nTurn objects elsewhere use serde snake_case \"in_progress\", so the client's other in_progress checks (Turn.tsx:85, Blocks.tsx) are correct. Only the summary field is affected. Severity \"minor\" is right: it only affects the sidebar running indicator, not data or control flow.",
+    "fix": "Accept both spellings of the summary status in the client. Do not rely on the server changing, because the format is upstream's documented wire format (runtime_threads.rs:5457).\n\nIn src/components/layout/Sidebar.tsx:81, replace `s.latest_turn_status === \"in_progress\"` with a shared helper:\n\n```ts\nconst isActiveTurnStatus = (st?: string | null) => {\n  const v = (st ?? \"\").toLowerCase().replace(/[_\\- ]/g, \"\");\n  return v === \"inprogress\" || v === \"queued\";\n};\n```\n\nThen use `const running = useThreads((st) => !!st.threads[s.id]?.activeTurnId) || isActiveTurnStatus(s.latest_turn_status);`\n\nOptionally narrow the type in src/lib/types.ts:45 to `\"queued\" | \"inprogress\" | \"completed\" | \"failed\" | \"interrupted\" | \"canceled\" | string | null` and add a comment that this field is Debug-lowercased, unlike turn.status, which is snake_case. Put the helper in src/lib so any other code that reads the summary status uses the same check.\n\nNothing on the request side needs to change. The `!s.archived` filter is redundant but harmless, since the default filter is active-only (runtime_api.rs:976-986)."
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/v1/threads/summary?limit=100&search=<q>",
+   "client_sites": "src/components/layout/Sidebar.tsx:227",
+   "server_handler": "crates/tui/src/runtime_api.rs:2478 -> list_threads_summary runtime_api.rs:3207 (search lowercased runtime_api.rs:3212, full scan when searching runtime_api.rs:3243-3247)",
+   "request_match": "ok: `search` and `limit` exist in ThreadSummaryQuery runtime_api.rs:963-966; value is URL-encoded (Sidebar.tsx:227)",
+   "response_match": "same as above: fields ok, latest_turn_status casing mismatch (runtime_threads.rs:10481-10482 vs Sidebar.tsx:81)",
+   "severity": "minor",
+   "verdict": {
+    "refuted": false,
+    "evidence": "The claim holds. The request works, but the response's status field is read wrong.\n\nRequest side (works):\n- The client sends `GET /v1/threads/summary?limit=100&search=${encodeURIComponent(search.trim())}` (codewhale-desktop/src/components/layout/Sidebar.tsx:227).\n- The route is `.route(\"/v1/threads/summary\", get(list_threads_summary))` (cw-src/crates/tui/src/runtime_api.rs:2478).\n- The handler (runtime_api.rs:3207-3210) extracts `Query<ThreadSummaryQuery>`. That struct (runtime_api.rs:962-973) has `limit: Option<usize>` and `search: Option<String>`. It has no serde renames, so the plain snake_case keys bind.\n- `limit` is clamped to 1..=500 (runtime_api.rs:3211), so 100 is accepted.\n- `search` is ASCII-lowercased (runtime_api.rs:3212). When it is set, the store read is unbounded (`scan_limit = None`, runtime_api.rs:3243-3247), and rows are kept by `thread_matches_summary_search` (runtime_threads.rs:10566-10594), which matches on id, model, the explicit title, or the latest turn's `input_summary`.\n- The response is `Json<Vec<ThreadSummary>>` (runtime_api.rs:3210, 3371). The struct (runtime_api.rs:988-1006) derives `Serialize` with no rename_all, so its field names are snake_case. They match the client's `ThreadSummary` (src/lib/types.ts:32-47) one-to-one, including types: `branch`/`head`/`latest_turn_id`/`latest_turn_status` are Option<String> vs string|null, `updated_at` is a chrono DateTime serialized as an ISO string, `workspace` is a PathBuf serialized as a string, and `pending_attention_count` is usize vs number.\n\nResponse mismatch (confirmed):\n- The server builds `latest_turn_status` as `format!(\"{:?}\", turn.status).to_ascii_lowercase()` (runtime_threads.rs:10481-10482).\n- `turn.status` is a `RuntimeTurnStatus` (runtime_threads.rs:1492). That enum derives `Debug` with variants Queued/InProgress/Completed/... (runtime_threads.rs:758-767). Its `#[serde(rename_all = \"snake_case\")]` affects only serde, not `{:?}`.\n- So the wire values are `\"queued\"`, `\"inprogress\"`, `\"completed\"`, `\"failed\"`, `\"interrupted\"`, `\"canceled\"`. They are NOT `\"in_progress\"`.\n- The client checks `s.latest_turn_status === \"in_progress\"` (Sidebar.tsx:81), which can never be true. The spinner for a thread that is running on the server but not tracked in the local `useThreads` store therefore never shows. That happens after an app reload or runtime reconnect, or for a turn started by the TUI or another client. The client also ignores `\"queued\"`, which the server counts as active work (runtime_threads.rs:770-773).\n- Severity \"minor\" is fair. It is a UI indicator only, but it is wrong on every row.\n\nRelated gaps on the same call (not a parse failure):\n1. The search hits are reduced to ids (Sidebar.tsx:228) and only used to filter the already-loaded `summaries` (Sidebar.tsx:245-256). That list comes from `GET /v1/threads/summary?limit=300` (src/store/app.ts:137). The server deliberately scans the whole store so older matches are found (comment at runtime_api.rs:3233-3242), but any hit outside the newest 300 threads is dropped by the client.\n2. The server lowercases only ASCII (runtime_api.rs:3212; runtime_threads.rs:10576-10594). A Cyrillic query is case-sensitive on the server. The client's own local filter uses Unicode `toLowerCase` (Sidebar.tsx:246-252).",
+    "fix": "1. Status casing (required), at Sidebar.tsx:81. Normalize before comparing, because the server sends Debug-lowercased names (\"inprogress\", \"queued\"), not snake_case:\n   `const ts = s.latest_turn_status?.toLowerCase().replace(/[_\\s-]/g, \"\");`\n   `const running = useThreads((st) => !!st.threads[s.id]?.activeTurnId) || ts === \"inprogress\" || ts === \"queued\";`\n   It is better to put this in a shared helper, for example `normTurnStatus()` in src/lib/types.ts, and use it everywhere `latest_turn_status` is read. That keeps the client working if upstream later switches to serde's snake_case `in_progress`. Leave the comparisons on live turn/item `status` values (Turn.tsx:85, Blocks.tsx) as they are; they come from serde-serialized records, which are snake_case.\n\n2. Search results (recommended), at Sidebar.tsx:224-256. Keep the full rows instead of only ids: `const [remoteRows, setRemoteRows] = useState<ThreadSummary[] | null>(null); ... setRemoteRows(res)`. Then build `filtered` as the local matches plus every remote row whose id is not already in `summaries`, skipping `archived`. Matches older than the 300 loaded threads then appear. The request itself can stay exactly as it is: `limit` and `search` bind correctly, and `encodeURIComponent` is right.\n\n3. Optional: for non-ASCII queries, keep the existing client-side Unicode `toLowerCase` filter as the primary matcher. The server matches Cyrillic case-sensitively, so a remote miss there is not a real \"no match\"."
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/v1/threads/{id}/context",
+   "client_sites": "src/store/app.ts:153 (fields read src/components/layout/Inspector.tsx:153-156,191-193; src/components/layout/StatusBar.tsx:53-54; src/components/chat/ChatArea.tsx:67)",
+   "server_handler": "crates/tui/src/runtime_api.rs:2527 -> context::get_thread_context crates/tui/src/runtime_api/context.rs:36-96; ThreadContextResponse context.rs:17-34",
+   "request_match": "ok (no body/query)",
+   "response_match": "Field names match ContextInfo src/lib/types.ts:97-111. Type drift: `provider` is Option<String> (context.rs:20) and `pressure` is Option<&str> (context.rs:33, null whenever the engine is not loaded context.rs:80-94) but TS declares both non-null string; `model_provider_id` (context.rs:21) is missing from the TS type. Client tolerates null via ?? (Inspector.tsx:193). Pressure values are low/moderate/high/critical (crates/runtime/src/context_budget.rs:113-120); Inspector.tsx:193 only warns on \"high\", not \"critical\"",
+   "severity": "minor",
+   "verdict": {
+    "refuted": false,
+    "evidence": "The claim holds. It is a minor type and UI drift, not a broken contract. One citation is wrong: ContextInfo is at src/lib/types.ts:137-151, not 97-111.\n\nRequest side (fine)\n- The route is GET /v1/threads/{id}/context (crates/tui/src/runtime_api.rs:2527).\n- The handler takes only State and Path(thread_id) (context.rs:36-39). There is no query or body extractor.\n- The client sends a bare GET to the same path (src/store/app.ts:153).\n\nResponse side\n- ThreadContextResponse (context.rs:16-34) derives Serialize only, with no rename or skip attributes. Every field is always emitted with its Rust name, and None becomes null.\n- Field names match ContextInfo (types.ts:137-151), except that `model_provider_id: Option<String>` (context.rs:21) is missing from the TS type.\n\nType drift\n- `provider` is `Option<String>` (context.rs:20) but TS declares it `provider: string` (types.ts:140).\n  - Fallback path: it is `thread.model_provider` (context.rs:83), which is `Option<String>` on ThreadRecord (runtime_threads.rs:812), so it can be null.\n  - Live path: it is always Some (context.rs:52), but its value is the literal \"unavailable\" when the engine has no provider identity (core/engine.rs ~4034-4037).\n- `pressure` is `Option<&'static str>` (context.rs:33) but TS declares it `pressure: string` (types.ts:150).\n  - It is null on the fallback path (context.rs:94). That path is taken when get_engine fails or get_context_budget returns Ok(None) for a route with no bounded window (engine/handle.rs:784-787).\n- Pressure values come from PressureLevel::label (crates/runtime/src/context_budget.rs:115-121): \"low\", \"moderate\", \"high\", \"critical\". Critical starts at 90% (context_budget.rs:52, 99-100).\n- Inspector.tsx:193 sets `warn={ctx?.pressure === \"high\"}`, so \"critical\" is shown without the warning color, the worst state looking calmer than \"high\". The red progress bar is computed separately (Inspector.tsx:155,170), so it still turns red.\n\nRuntime impact today\n- No crash. Every consumer null-guards:\n  - Inspector.tsx:153-156 and 191-193 use ?? and fmtTokens, which handles null (src/lib/format.ts:1-2).\n  - StatusBar.tsx:53-54 uses ??.\n  - ChatArea.tsx:67 uses a truthiness check.\n- Nothing reads ctx.provider or model_provider_id (grep over src finds no use).\n- Fetch errors are swallowed (app.ts:155-157).\n\nRelated side effect (not in the claim)\n- get_engine calls ensure_engine_loaded (runtime_threads.rs:15893-15896). So every refreshContext call loads the thread's engine: on thread open (app.ts:175, 192, 240) and on the 15 s poll for the active thread (useBootstrap.ts:119-122).\n- live:false therefore only appears when that load fails or the route has no bounded window. It does not mean the thread is idle.",
+    "fix": "No change is needed in what the client sends; the GET is correct as is. On the read side, three changes:\n\n1. Update the ContextInfo type in src/lib/types.ts:137-151 to:\n   - `provider: string | null;` (and treat \"unavailable\" as unknown when displaying it)\n   - add `model_provider_id: string | null;`\n   - `pressure: \"low\" | \"moderate\" | \"high\" | \"critical\" | null;`\n   - keep `live: boolean` and use it in the UI: when `live === false`, show the window size only and render the token, compaction and pressure rows as \"unavailable\".\n\n2. Change src/components/layout/Inspector.tsx:193 to:\n   `warn={ctx?.pressure === \"high\" || ctx?.pressure === \"critical\"}`\n   Optionally colour \"critical\" red to match the bar and show translated labels (low, moderate, high, critical) instead of the raw strings.\n\n3. Optional: the server loads the engine when this endpoint is called (runtime_threads.rs:15893-15896). To avoid waking idle threads, poll only while a turn is running or right after a turn finishes, instead of every 15 s (src/hooks/useBootstrap.ts:119-122)."
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/v1/usage?group_by=day",
+   "client_sites": "src/components/overlays/SidePanels.tsx:108 (reads totals.turns/input_tokens/output_tokens/cached_tokens SidePanels.tsx:120-123; buckets[].key/turns/input_tokens/output_tokens SidePanels.tsx:142-150)",
+   "server_handler": "crates/tui/src/runtime_api.rs:2764 -> get_usage runtime_api.rs:10111-10146; UsageQuery runtime_api.rs:10096-10103; UsageAggregation crates/tui/src/runtime_threads.rs:5526-5532",
+   "request_match": "ok: group_by=day is accepted (runtime_api.rs:10128-10129)",
+   "response_match": "Field names all match (UsageTotals runtime_threads.rs:5387-5425, UsageBucket runtime_threads.rs:5493-5522). Semantic drift: `turns` counts provider-call usage records incl. child/compaction calls (runtime_threads.rs:5423-5425, 5521-5522), so the \"Ходов\" tiles over-count user turns",
+   "severity": "minor",
+   "verdict": {
+    "refuted": false,
+    "evidence": "I'm confirming the claim. Its severity is minor: the request and field names work, but the \"Ходов\" (turns) number counts the wrong thing.\n\nWhat works:\n- Transport. The path `/v1/usage?group_by=day` gets past allowed_path, which only checks the `/v1/` prefix and `..` (src-tauri/src/api.rs:39-41). It is sent as `{base}{path}`, so the query string reaches the server unchanged (api.rs:65).\n- Route and query. The route is GET only (cw-src crates/tui/src/runtime_api.rs:2764). UsageQuery uses a plain `#[derive(Deserialize)]` with `since`, `until` and `group_by` all optional, and no renames (runtime_api.rs:10096-10103). get_usage reads it with `Query<UsageQuery>` (runtime_api.rs:10111-10113), and `\"day\"` maps to UsageGroupBy::Day (runtime_api.rs:10128-10129). With no since or until, the whole history comes back (runtime_api.rs:10114-10121).\n- Response shape. The handler returns `json!(aggregation)` (runtime_api.rs:10144-10145). UsageAggregation has `totals: UsageTotals` and `buckets: Vec<UsageBucket>` (runtime_threads.rs:5526-5532). Both structs derive plain `Serialize` with no renames, so the fields are snake_case. The client reads `input_tokens`, `output_tokens`, `cached_tokens` and `turns` from totals (runtime_threads.rs:5388-5390, 5425) and `key`, `turns`, `input_tokens` and `output_tokens` from each bucket (runtime_threads.rs:5494-5496, 5522). All of these are u64 or String, never null, so `fmtTokens` (src/lib/format.ts:1-7) always gets a number.\n- Order. `buckets` is collected from a BTreeMap keyed by \"YYYY-MM-DD\" (runtime_threads.rs:10624-10625, 10724), so it comes back oldest first. The client's `.slice().reverse()` (SidePanels.tsx:142-144) then shows newest first, as intended.\n\nWhat is wrong:\n1. `turns` is not the number of user turns. The doc comment says it counts \"provider-call usage records (parent turns plus child and compaction calls)\" (runtime_threads.rs:5423-5425, 5521). aggregate_usage adds a record for:\n   - the parent usage (10634-10645)\n   - every `routed_usage` child, such as sub-agents and compaction (10663-10673, through 5896-5927)\n   - every exact drop record (10674-10686)\n   - every truncated or dropped fallback receipt (10691-10700)\n   Each one increments `turns`: accumulate_runtime_usage_record (5803, 5842), accumulate_exact_runtime_usage_drop (5943, 5967) and accumulate_truncated_runtime_usage, which adds the whole dropped count (5867, 5887). One user prompt that starts sub-agents or triggers compaction therefore shows as several \"Ходов\", both in the summary tile (SidePanels.tsx:120) and in the per-day column (SidePanels.tsx:136, 148). Neither UsageTotals nor UsageBucket has a parent-turn-only counter (5387-5425, 5493-5522), so the client cannot read the right number from this endpoint.\n2. A related issue the reviewer did not mention: day keys are in UTC. The key is `dispatched_at` or `created_at` (a `DateTime<Utc>`) formatted as `%Y-%m-%d` (runtime_threads.rs:5710-5713). For a user in UTC+3, work between 00:00 and 03:00 local time lands under the previous date in the \"День\" column (SidePanels.tsx:147).",
+    "fix": "No change is needed to the request: `GET /v1/usage?group_by=day` is correct as written.\n\nIn src/components/overlays/SidePanels.tsx:\n- **Turn count:** Rename the \"Ходов\" label in both the tile (line 120) and the table header (line 136) to something like \"Вызовов модели\" (\"model calls\"). That matches what `totals.turns` and `buckets[].turns` actually count.\n  - If the panel really needs user turns, it has to count them separately: walk `GET /v1/threads` and each thread's turns, and count parent turns per day. `/v1/usage` has no field for this.\n  - Keep the tooltip or footnote that the number includes sub-agent and compaction calls.\n- **Day dates:** Say in the header that the days are UTC (\"День (UTC)\"). Alternatively, rebuild the day buckets in local time on the client, which means requesting a different grouping or querying with per-day `since`/`until` RFC 3339 bounds at local midnight.\n- **Optional:** Show `totals.dropped_usage_records` and treat `cost_complete` as \"data incomplete\", since `turns` may include dropped receipts that have no tokens."
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/v1/threads/{id}/events?replay_limit=4096&progress=true&since_seq=N (SSE)",
+   "client_sites": "src-tauri/src/api.rs:129-135 (request), api.rs:158-191 (frame loop), api.rs:209-233 (parse_frame); consumed in src/store/threads.ts:211-354, src/hooks/useBootstrap.ts:9-43",
+   "server_handler": "crates/tui/src/runtime_api.rs:2611 -> stream_thread_events runtime_api.rs:9052-9118; ThreadEventsQuery runtime_api.rs:1510-1515; frame builders thread_stream_progress runtime_api.rs:9124-9135, thread_stream_end runtime_api.rs:9174-9184, thread_journal_frame runtime_api.rs:9188-9206, envelope runtime_api.rs:9675-9704, sse_json runtime_api.rs:9907-9910",
+   "request_match": "ok: since_seq, replay_limit, progress are the exact snake_case keys (runtime_api.rs:1511-1514); replay_limit 4096 equals the max MAX_RUNTIME_EVENT_REPLAY_TAIL (crates/tui/src/runtime_threads.rs:75, checked runtime_api.rs:9076-9083); bearer sent api.rs:135. BUT replay_limit is a tail limit: publish_tail_event_replay keeps only the newest 4096 events after since_seq and drops the rest (runtime_threads.rs:4450-4481), and every item.delta chunk is persisted (runtime_threads.rs:16850-16857 via emit_event 9664-9675). So opening a long thread from since_seq=0 (app.ts:173,189), or reconnecting after a long gap, silently loses early turn.started/item.started frames. The client ignores `previous_seq` (runtime_api.rs:9695-9703), the only gap signal",
+   "response_match": "Journal frames are `event:<name>` + `id:<seq>` + `data:<RuntimeEventEnvelope>` with payload under `.payload` (crates/protocol/src/runtime/mod.rs:24-41), and parse_frame handles them. MISMATCH 1: the stream.progress frame is NOT an envelope; `state` is top level and there is no `payload` key (runtime_api.rs:9124-9135), but threads.ts:212,217-218 reads ev.payload.state, so `t.live` is never set. Effects: src/hooks/useBootstrap.ts:17 returns early, so auto-approve rules never fire; src/components/chat/MessageList.tsx:75 shows a skeleton forever on a new or empty thread. MISMATCH 2: the runtime emits only `turn.completed` for terminal turns, with turn.status failed/interrupted/canceled (emit_turn_completed_if_missing runtime_threads.rs:9703-9731, called at 18712); turn.failed/turn.interrupted exist only in exec_agent.rs:1282-1283. So threads.ts:234 (lastError) and useBootstrap.ts:34-35 are dead; the error text still arrives in turn.error (runtime_threads.rs:1636) through mergeTurnRecord (threads.ts:149). Other payload keys read by the client match: approval.required approval_id/tool_call_id/tool_name (runtime_threads.rs:17976-17986); approval.decided decision/cancelled/timeout (runtime_threads.rs:18062-18070, 18124-18130, 18185-18193); turn.usage usage/duration_ms/first_token_ms (runtime_threads.rs:18386-18391); turn.lifecycle status (runtime_threads.rs:16779-16781); item.delta delta/kind (runtime_threads.rs:16855-16856); item metadata tool_use_id/tool_input/visibility (runtime_threads.rs:16980-16999, 19544); turn.workspace_snapshot changed_paths (crates/tui/src/snapshot/mod.rs:133); item kinds and status are snake_case (runtime_threads.rs:776-799)",
+   "severity": "major",
+   "verdict": {
+    "refuted": false,
+    "evidence": "Verdict: partly stale, but the main defect is real and still unfixed. The working tree has uncommitted edits (git status shows threads.ts, useBootstrap.ts, app.ts and MessageList.tsx modified), so I checked against the current files, not HEAD.\n\n1) MISMATCH 1 (stream.progress) is real at HEAD but already fixed in the working tree.\n- Server: the progress frame is not an envelope. It is {schema_version, event, kind, thread_id, seq, state} with `state` at the top level and no payload (runtime_api.rs:9124-9135).\n- HEAD: the client read `p.state`, which the git diff shows was removed.\n- Now: threads.ts:236 reads `(ev as any).state`, and enqueueEvent reads the top-level `state` (threads.ts:534-542). useBootstrap no longer checks t.live; it uses isStreamLive (useBootstrap.ts:39-41, 47-48).\n- Dedup lets the frame through even though its seq is at or below lastSeq (threads.ts:423), so `live` is set and the skeleton condition at MessageList.tsx:123 clears.\n\n2) MISMATCH 2 is accurate but harmless.\n- The runtime emits only \"turn.completed\" for terminal turns (emit_turn_completed_if_missing, runtime_threads.rs:9703-9731; call sites 9812, 14005, 18712). turn.failed and turn.interrupted appear only in exec_agent.rs:1282-1283 and the TUI outbox (tui/ui/event_loop.rs:3540-3542). Statuses are snake_case (runtime_threads.rs:758-767).\n- So the turn.failed branch at threads.ts:252 (lastError) is dead. But the turn's error still arrives as turn.error (runtime_threads.rs:1636-1637) and is merged by mergeTurnRecord (threads.ts:166), and Turn.tsx:133 renders it.\n- Refresh still works: useBootstrap.ts:78 includes turn.completed in TURN_END.\n- New dead code in the working tree: the only `turn.lifecycle` emission sends {\"status\":\"in_progress\"} (runtime_threads.rs:16775-16781, the only occurrence). So the terminal-status branches at useBootstrap.ts:64-72 and threads.ts:258-260 never fire. This is harmless because turn.completed covers them.\n\n3) CONFIRMED, not fixed: tail-limited replay silently loses history.\n- Client: api.rs:129 still sends `replay_limit=4096`. A fresh open subscribes from 0: openStream resets the thread when `fresh` (or when it has no local copy), then subscribes from lastSeq (app.ts:99-107; called with fresh=true at app.ts:221, 231, 258).\n- Server: ThreadEventsQuery takes replay_limit as Option<usize> (runtime_api.rs:1510-1515) and passes it to replay_events (runtime_api.rs:9084-9088). Some(limit) selects publish_tail_event_replay (runtime_threads.rs:4310-4314). That keeps only the newest `limit` events after since_seq and moves base_seq past the ones it drops (runtime_threads.rs:4450-4481). With None, publish_full_event_replay is used, which drops nothing and streams in batches of 256 (runtime_threads.rs:4410-4448).\n- Every streamed agent_message chunk is persisted as its own item.delta event (runtime_threads.rs:16840-16857). Batching is only a 32 ms window (runtime_threads.rs:80). For a local model, 4096 events is therefore only a few long turns. Early turn.started/item.started events and user prompts (user_message items) are lost.\n- The client has no gap detection. The only signals are the first progress frame's `seq` (= base_seq, runtime_api.rs:9246) and `previous_seq` on journal frames (runtime_api.rs:9198-9203, 9695-9703). The desktop app reads neither (grep finds no previous_seq in src or src-tauri/src).\n- Seq numbers are global across threads (state.next_seq, runtime_threads.rs:4141-4144). So the gap test is \"base_seq > requested since_seq\", not \"seq != previous+1\".\n- The server documents the intended pattern: GET /v1/threads/{id} returns ThreadDetail with latest_seq, pending_approvals and pending_user_inputs \"without replaying events older than latest_seq\" (runtime_threads.rs:5283-5303; route runtime_api.rs:2485; handler runtime_api.rs:7328-7337). The client already has threadViewFromDetail (threads.ts:476-507) but uses it only for export (export.ts:84-85).",
+    "fix": "1) Opening a thread (app.ts openStream, lines 99-111):\n- When opening fresh or with no local copy, first call `api.request(\"GET\", \"/v1/threads/${id}\")`.\n- Seed the store with threadViewFromDetail(detail), but set live=false and streamState=\"connecting\" instead of live=true / \"closed\".\n- Then call `api.subscribe(id, detail.latest_seq)`. The stream then carries only new events, and pending approvals and user inputs come from the snapshot.\n- Do the same in reloadThread (app.ts:229-236).\n- Minimal alternative: remove `replay_limit=4096` from the URL at api.rs:129. With no replay_limit the server does a full lossless replay (runtime_threads.rs:4410-4448), but long threads then re-send every item.delta.\n\n2) Gap detection in src-tauri/src/api.rs stream_loop (lines 119-191):\n- Remember the since_seq used for each connection.\n- On the first stream.progress frame, parse `seq` from the JSON. Alternatively, use `previous_seq` from the first journal frame.\n- If that value is greater than the requested since_seq, the server dropped history. Emit `emit_state(app, thread_id, \"gap\", ...)` and have the UI re-seed from GET /v1/threads/{id} (step 1).\n- Do not compare seq with previous_seq+1: seq is global across threads (runtime_threads.rs:4141-4144).\n\n3) Cleanup:\n- threads.ts:252: set lastError on `env.event === \"turn.completed\" && p.turn.status === \"failed\"`, using p.turn.error. Otherwise remove the dead turn.failed/turn.interrupted/turn.canceled cases.\n- Remove the terminal-status branches of turn.lifecycle (useBootstrap.ts:64-72, threads.ts:258-260). The runtime only emits status \"in_progress\" there (runtime_threads.rs:16775-16781).\n- No change is needed for stream.progress: threads.ts:236 and 534-542 already read the top-level `state`."
+   }
+  }
+ ]
+}

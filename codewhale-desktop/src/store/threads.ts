@@ -1,5 +1,15 @@
 import { create } from "zustand";
-import type { CwEvent, CwEventEnvelope, ItemRecord, ThreadRecord, TurnRecord, Usage } from "../lib/types";
+import type {
+  CwEvent,
+  CwEventEnvelope,
+  ItemRecord,
+  ThreadDetail,
+  ThreadRecord,
+  TurnRecord,
+  Usage,
+  UserInputAnswer,
+  UserInputQuestion,
+} from "../lib/types";
 import { findToolArgs, findToolName } from "../lib/tools";
 
 export interface ItemView extends ItemRecord {
@@ -30,8 +40,13 @@ export interface Approval {
 export interface UserInputRequest {
   id: string;
   turnId: string | null;
+  questions: UserInputQuestion[];
   payload: any;
   status: "pending" | "answered" | "canceled";
+  /** Answers sent from this window (the answered event does not carry them). */
+  answers?: UserInputAnswer[];
+  /** Set when the runtime re-raised the request because the engine rejected an answer. */
+  deliveryError?: string;
 }
 
 export interface TurnView {
@@ -104,6 +119,8 @@ function emptyThread(id: string): ThreadView {
     toolCalls: {},
   };
 }
+
+const ACTIVE_TURN = new Set(["queued", "in_progress"]);
 
 function ensureTurn(t: ThreadView, turnId: string, ts: string): TurnView {
   let idx = t.turnIndex[turnId];
@@ -215,7 +232,8 @@ function applyOne(t: ThreadView, env: CwEventEnvelope, ev: CwEvent) {
 
   switch (env.event) {
     case "stream.progress":
-      if (p.state === "live") t.live = true;
+      // Transport frame: `state` sits at the top level, there is no payload.
+      if ((ev as any).state === "live" || p.state === "live") t.live = true;
       return;
     case "thread.started":
     case "thread.updated":
@@ -276,11 +294,14 @@ function applyOne(t: ThreadView, env: CwEventEnvelope, ev: CwEvent) {
       if (!id) return;
       const prev = t.items[id];
       if (!prev) {
+        // A delta without a turn id belongs to the running turn; with none running, drop it.
+        const turnId = ev.turn_id ?? t.activeTurnId ?? t.turns.findLast((x) => ACTIVE_TURN.has(x.status))?.id;
+        if (!turnId) return;
         upsertItem(
           t,
           {
             id,
-            turn_id: ev.turn_id ?? "",
+            turn_id: turnId,
             kind: p.kind ?? "agent_message",
             status: "in_progress",
             summary: "",
@@ -334,7 +355,18 @@ function applyOne(t: ThreadView, env: CwEventEnvelope, ev: CwEvent) {
     case "user_input.required": {
       const id = p.input_id ?? p.id;
       if (!id) return;
-      t.userInputs = { ...t.userInputs, [id]: { id, turnId: ev.turn_id, payload: p, status: "pending" } };
+      const prev = t.userInputs[id];
+      const questions: UserInputQuestion[] = Array.isArray(p.request?.questions) ? p.request.questions : [];
+      // Re-raised with `delivery_error` when the engine rejected an answer: pending again.
+      t.userInputs = {
+        ...t.userInputs,
+        [id]: { ...prev, id, turnId: ev.turn_id, questions, payload: p, status: "pending", deliveryError: p.delivery_error },
+      };
+      if (ev.turn_id) {
+        // Rendered inline like approvals, as "input:<id>".
+        const block = `input:${id}`;
+        patchTurn(t, ev.turn_id, ts, (turn) => (turn.blocks.includes(block) ? turn : { ...turn, blocks: [...turn.blocks, block] }));
+      }
       return;
     }
     case "user_input.answered":
@@ -359,6 +391,14 @@ interface ThreadsState {
   setStream: (threadId: string, state: string, message?: string | null) => void;
   reset: (threadId: string) => void;
   markApproval: (threadId: string, approvalId: string, status: Approval["status"]) => void;
+  markUserInput: (
+    threadId: string,
+    inputId: string,
+    status: UserInputRequest["status"],
+    answers?: UserInputAnswer[],
+  ) => void;
+  /** Records a turn accepted by POST .../turns before its `turn.started` event arrives. */
+  noteTurnStarted: (threadId: string, turn: TurnRecord) => void;
 }
 
 export const useThreads = create<ThreadsState>((set) => ({
@@ -406,7 +446,63 @@ export const useThreads = create<ThreadsState>((set) => ({
         threads: { ...s.threads, [threadId]: { ...t, approvals: { ...t.approvals, [approvalId]: { ...a, status } } } },
       };
     }),
+  markUserInput: (threadId, inputId, status, answers) =>
+    set((s) => {
+      const t = s.threads[threadId];
+      const u = t?.userInputs[inputId];
+      if (!t || !u) return s;
+      return {
+        threads: {
+          ...s.threads,
+          [threadId]: { ...t, userInputs: { ...t.userInputs, [inputId]: { ...u, status, answers: answers ?? u.answers } } },
+        },
+      };
+    }),
+  noteTurnStarted: (threadId, rec) =>
+    set((s) => {
+      const cur = s.threads[threadId];
+      // Once the turn's events arrived they are authoritative (and may have finished it already).
+      if (!cur || !rec?.id || !ACTIVE_TURN.has(rec.status) || cur.turnIndex[rec.id] !== undefined) return s;
+      const t = { ...cur };
+      patchTurn(t, rec.id, rec.created_at ?? new Date().toISOString(), (turn) => mergeTurnRecord(turn, rec));
+      t.activeTurnId = rec.id;
+      return { threads: { ...s.threads, [threadId]: t } };
+    }),
 }));
+
+/** Builds a view from the canonical snapshot (complete history, unlike the bounded event replay). */
+export function threadViewFromDetail(detail: ThreadDetail): ThreadView {
+  const t = emptyThread(detail.thread.id);
+  t.thread = detail.thread;
+  t.lastSeq = detail.latest_seq ?? 0;
+  t.live = true;
+  t.streamState = "closed";
+  for (const rec of detail.turns ?? []) {
+    patchTurn(t, rec.id, rec.created_at, (turn) => mergeTurnRecord(turn, rec));
+  }
+  for (const it of detail.items ?? []) {
+    upsertItem(t, { ...it, detail: it.detail ?? "" }, it.started_at ?? it.ended_at ?? "", !ACTIVE_TURN.has(it.status));
+  }
+  for (const a of detail.pending_approvals ?? []) {
+    t.approvals[a.id] = {
+      id: a.id,
+      turnId: a.turn_id,
+      toolCallId: a.tool_call_id,
+      toolName: a.tool_name,
+      payload: a,
+      status: "pending",
+      createdAt: "",
+      seq: t.lastSeq,
+    };
+    patchTurn(t, a.turn_id, "", (turn) => ({ ...turn, approvals: [...turn.approvals, a.id], blocks: [...turn.blocks, `approval:${a.id}`] }));
+  }
+  for (const u of detail.pending_user_inputs ?? []) {
+    t.userInputs[u.id] = { id: u.id, turnId: u.turn_id, questions: u.request?.questions ?? [], payload: u, status: "pending" };
+    patchTurn(t, u.turn_id, "", (turn) => ({ ...turn, blocks: [...turn.blocks, `input:${u.id}`] }));
+  }
+  t.activeTurnId = t.turns.findLast((x) => ACTIVE_TURN.has(x.status))?.id;
+  return t;
+}
 
 // ---- Frame-batched event intake ----
 let queue: CwEventEnvelope[] = [];
@@ -419,7 +515,29 @@ function flush() {
   if (batch.length) useThreads.getState().applyBatch(batch);
 }
 
+// Replay vs live per stream, tracked on intake: the store's `live` lags by a frame
+// and never goes back to false, so it cannot classify an individual event.
+const streamLive = new Map<string, boolean>();
+
+/** True when events of this thread's stream are live (history replay finished). */
+export function isStreamLive(threadId: string): boolean {
+  return streamLive.get(threadId) === true;
+}
+
+/** Call before (re)subscribing: the server replays history before going live. */
+export function markStreamReplaying(threadId: string) {
+  streamLive.set(threadId, false);
+}
+
 export function enqueueEvent(env: CwEventEnvelope) {
+  if (env.event === "stream.progress") {
+    try {
+      const state = JSON.parse(env.data)?.state;
+      if (state === "live" || state === "replaying") streamLive.set(env.threadId, state === "live");
+    } catch {
+      /* malformed frame: keep the previous state */
+    }
+  }
   queue.push(env);
   if (!scheduled) {
     scheduled = true;
@@ -432,6 +550,7 @@ export function enqueueEvent(env: CwEventEnvelope) {
 export function threadActivity(t?: ThreadView): "idle" | "thinking" | "tool" | "approval" | "error" {
   if (!t) return "idle";
   if (Object.values(t.approvals).some((a) => a.status === "pending")) return "approval";
+  if (Object.values(t.userInputs).some((u) => u.status === "pending")) return "approval";
   if (!t.activeTurnId) return t.turns.at(-1)?.status === "failed" ? "error" : "idle";
   const turn = t.turns[t.turnIndex[t.activeTurnId]];
   const last = turn?.blocks.at(-1);

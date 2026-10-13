@@ -1,0 +1,50 @@
+{
+  "endpoint": "POST /v1/threads/{id}/turns/{turn_id}/interrupt",
+  "phase": "mock",
+  "request": {
+    "method": "POST",
+    "path": "/v1/threads/thr_0a36e0abf43743d9946e29654d7d448e/turns/turn_bd690984454e45c18ece169e1e5a05c5/interrupt",
+    "auth": true,
+    "body": {}
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "schema_version": 2,
+      "id": "turn_bd690984454e45c18ece169e1e5a05c5",
+      "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+      "status": "in_progress",
+      "input_summary": "Говори медленно [slow]",
+      "created_at": "2026-10-13T21:30:19.955770862Z",
+      "started_at": "2026-10-13T21:30:19.984595115Z",
+      "routing_settlement": false,
+      "permission_posture": "ask",
+      "mode": "agent",
+      "effective_provider": "ollama",
+      "effective_provider_id": "ollama",
+      "effective_billing_surface": "local-no-bill",
+      "effective_endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+      "effective_billing_mode": "local",
+      "effective_dispatched_at": "2026-10-13T21:30:20.092262008Z",
+      "effective_model": "qwen3:4b",
+      "item_ids": [
+        "item_fa66cabfd5d847aca92b8494cad27dac",
+        "item_38ae36b171be41ecb2889a6cab201b5d",
+        "item_05ba2eaf29a74b22bbb9e1038f1c197b",
+        "item_03ce75763b04475f81df5485e4d49658"
+      ],
+      "steer_count": 0,
+      "workspace_snapshots": [
+        {
+          "kind": "pre_turn",
+          "snapshot_id": "876e8d40002cf79f12511331025ec2df1684cb82",
+          "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+          "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+        }
+      ]
+    }
+  },
+  "elapsed_ms": 10,
+  "recorded_at": "2026-10-13T21:30:22+00:00"
+}

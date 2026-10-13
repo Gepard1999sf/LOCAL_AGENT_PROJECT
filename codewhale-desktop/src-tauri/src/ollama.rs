@@ -68,15 +68,13 @@ pub async fn ollama_status(app: AppHandle) -> Value {
 #[tauri::command]
 pub async fn ollama_models(app: AppHandle) -> Result<Vec<OllamaModel>, String> {
     let (http, url) = client(&app);
-    let tags: Value = http
+    let resp = http
         .get(format!("{url}/api/tags"))
         .timeout(Duration::from_secs(5))
         .send()
         .await
-        .map_err(|e| format!("Ollama недоступна: {e}"))?
-        .json()
-        .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Ollama недоступна: {e}"))?;
+    let tags: Value = check_status(resp).await?.json().await.map_err(|e| e.to_string())?;
     let models = tags.get("models").and_then(Value::as_array).cloned().unwrap_or_default();
     let futures = models.into_iter().map(|m| {
         let http = http.clone();
@@ -149,9 +147,7 @@ pub async fn ollama_create_variant(app: AppHandle, from: String, name: String, n
         .send()
         .await
         .map_err(|e| e.to_string())?;
-    if !resp.status().is_success() {
-        return Err(resp.text().await.unwrap_or_default());
-    }
+    check_status(resp).await?;
     Ok(())
 }
 
@@ -159,11 +155,27 @@ pub async fn ollama_create_variant(app: AppHandle, from: String, name: String, n
 #[tauri::command]
 pub async fn ollama_unload(app: AppHandle, model: String) -> Result<(), String> {
     let (http, url) = client(&app);
-    http.post(format!("{url}/api/generate"))
+    let resp = http
+        .post(format!("{url}/api/generate"))
         .json(&json!({ "model": model, "keep_alive": 0 }))
         .timeout(Duration::from_secs(15))
         .send()
         .await
         .map_err(|e| e.to_string())?;
+    check_status(resp).await?;
     Ok(())
+}
+
+/// Turns a non-2xx Ollama reply into an error carrying its message (`{"error": "..."}`) or body.
+async fn check_status(resp: reqwest::Response) -> Result<reqwest::Response, String> {
+    let status = resp.status();
+    if status.is_success() {
+        return Ok(resp);
+    }
+    let text = resp.text().await.unwrap_or_default();
+    let msg = serde_json::from_str::<Value>(&text)
+        .ok()
+        .and_then(|v| v.get("error").and_then(Value::as_str).map(str::to_owned))
+        .unwrap_or_else(|| text.chars().take(500).collect());
+    Err(format!("Ollama: HTTP {}: {msg}", status.as_u16()))
 }

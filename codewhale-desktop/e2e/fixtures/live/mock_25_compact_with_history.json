@@ -1,0 +1,59 @@
+{
+  "endpoint": "POST /v1/threads/{id}/compact",
+  "phase": "mock",
+  "request": {
+    "method": "POST",
+    "path": "/v1/threads/thr_0a36e0abf43743d9946e29654d7d448e/compact",
+    "auth": true,
+    "body": {}
+  },
+  "status": 202,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "thread": {
+        "schema_version": 2,
+        "id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "created_at": "2026-10-13T21:29:50.075705243Z",
+        "updated_at": "2026-10-13T21:30:24.453729547Z",
+        "model": "qwen3:4b",
+        "model_provider": "ollama",
+        "model_provider_id": "ollama",
+        "allowed_tools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "todo_write"
+        ],
+        "workspace": "/work/demo-project",
+        "mode": "agent",
+        "permission_posture": "ask",
+        "allow_shell": true,
+        "trust_mode": false,
+        "auto_approve": false,
+        "latest_turn_id": "turn_cd5a0af5ec3d46dba7ffa28055efbef6",
+        "archived": false
+      },
+      "turn": {
+        "schema_version": 2,
+        "id": "turn_cd5a0af5ec3d46dba7ffa28055efbef6",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "status": "in_progress",
+        "input_summary": "Manual context compaction",
+        "created_at": "2026-10-13T21:30:24.453729547Z",
+        "started_at": "2026-10-13T21:30:24.453729547Z",
+        "routing_settlement": false,
+        "permission_posture": "ask",
+        "mode": "agent",
+        "effective_provider": "ollama",
+        "effective_provider_id": "ollama",
+        "effective_model": "qwen3:4b",
+        "item_ids": [],
+        "steer_count": 0
+      }
+    }
+  },
+  "elapsed_ms": 94,
+  "recorded_at": "2026-10-13T21:30:24+00:00"
+}

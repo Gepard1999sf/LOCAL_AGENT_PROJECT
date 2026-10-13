@@ -1,0 +1,22 @@
+{
+  "endpoint": "POST /v1/threads/{id}/turns/{turn_id}/interrupt (unknown turn)",
+  "phase": "offline",
+  "request": {
+    "method": "POST",
+    "path": "/v1/threads/thr_66897057f8ab4643be149a7d962d9407/turns/turn_doesnotexist/interrupt",
+    "auth": true,
+    "body": {}
+  },
+  "status": 409,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "error": {
+        "message": "No active turn on thread thr_66897057f8ab4643be149a7d962d9407",
+        "status": 409
+      }
+    }
+  },
+  "elapsed_ms": 2,
+  "recorded_at": "2026-10-13T21:29:08+00:00"
+}

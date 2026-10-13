@@ -1,8 +1,9 @@
 //! Windows process helpers: liveness checks and a kill-on-close Job Object.
 //!
-//! The Job Object guarantees the CodeWhale app-server dies with the desktop app,
-//! even after a crash. Without it an orphaned server keeps the runtime owner lease
-//! and the next launch fails with "opening selected Windows owner".
+//! Each app-server gets its own Job Object, so a restart kills the whole process
+//! tree, and the server dies with the desktop app even after a crash (the OS closes
+//! the job handle). Without it an orphaned server keeps the runtime owner lease and
+//! the next launch fails with "opening selected Windows owner".
 
 #[cfg(windows)]
 mod imp {
@@ -10,7 +11,7 @@ mod imp {
     use windows_sys::Win32::System::JobObjects::{
         AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-        SetInformationJobObject,
+        SetInformationJobObject, TerminateJobObject,
     };
     use windows_sys::Win32::System::Threading::{
         GetExitCodeProcess, GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
@@ -46,6 +47,13 @@ mod imp {
 
         pub fn assign(&self, process: HANDLE) -> bool {
             unsafe { AssignProcessToJobObject(self.0, process) != 0 }
+        }
+
+        /// Kills every process in the job right away (closing the handle does the same later).
+        pub fn terminate(&self) {
+            unsafe {
+                TerminateJobObject(self.0, 1);
+            }
         }
     }
 
@@ -83,12 +91,6 @@ mod imp {
 
 #[cfg(not(windows))]
 mod imp {
-    pub struct Job;
-    impl Job {
-        pub fn new() -> Option<Self> {
-            Some(Job)
-        }
-    }
     pub fn process_info(pid: u32) -> (bool, Option<(u32, u32)>) {
         (std::path::Path::new(&format!("/proc/{pid}")).exists(), None)
     }

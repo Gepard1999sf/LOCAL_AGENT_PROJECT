@@ -1,0 +1,25 @@
+{
+  "endpoint": "POST /v1/approvals/{approval_id} (invalid decision)",
+  "phase": "offline",
+  "request": {
+    "method": "POST",
+    "path": "/v1/approvals/appr_doesnotexist",
+    "auth": true,
+    "body": {
+      "decision": "approve",
+      "remember": false
+    }
+  },
+  "status": 400,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "error": {
+        "message": "invalid decision 'approve'; expected \"allow\" or \"deny\"",
+        "status": 400
+      }
+    }
+  },
+  "elapsed_ms": 1,
+  "recorded_at": "2026-10-13T21:29:08+00:00"
+}

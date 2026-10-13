@@ -8,12 +8,8 @@ import { fmtBytes, fmtDuration, fmtTimeSec, fmtTokens } from "../../lib/format";
 import { api } from "../../lib/tauri";
 import { IconButton, Button } from "../ui/primitives";
 import { toast } from "sonner";
-
-function resolvePath(p: string) {
-  const ws = useApp.getState().settings?.workspace ?? "";
-  if (/^[A-Za-z]:[\\/]/.test(p) || !ws) return p;
-  return `${ws.replace(/[\\/]+$/, "")}\\${p.replace(/\//g, "\\")}`;
-}
+import { resolvePath } from "../../lib/paths";
+import { effectiveCtx } from "../../lib/models";
 
 function ToolsTab({ threadId }: { threadId: string | null }) {
   const thread = useThreads((s) => (threadId ? s.threads[threadId] : undefined));
@@ -156,7 +152,7 @@ function ContextTab({ threadId }: { threadId: string | null }) {
   const modelName = ctx?.model ?? thread?.thread?.model;
   const loaded = ollama?.loaded?.find((m) => m.name === modelName || m.model === modelName);
   const modelInfo = models.find((m) => m.name === modelName);
-  const ollamaCtx = loaded?.context_length ?? modelInfo?.numCtx ?? null;
+  const ollamaCtx = loaded?.context_length ?? effectiveCtx(modelInfo);
   const mismatch = win > 0 && ollamaCtx != null && ollamaCtx < win;
   const genMs = turns.reduce((a, t) => a + (t.durationMs ?? 0), 0);
   const outTok = turns.reduce((a, t) => a + t.outputTokens, 0);
@@ -202,7 +198,6 @@ function ContextTab({ threadId }: { threadId: string | null }) {
       )}
 
       <div className="my-3 h-px bg-line" />
-      <Row label="💰 Стоимость (локально)" value="0.00 ₽" />
       <Row label="Время генерации" value={fmtDuration(genMs) || "—"} />
       <Row label="Сгенерировано токенов" value={fmtTokens(outTok)} />
 

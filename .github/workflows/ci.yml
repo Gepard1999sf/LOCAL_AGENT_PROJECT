@@ -1,0 +1,251 @@
+# CI for CodeWhale Desktop (Tauri 2 + React/TS). The app lives in codewhale-desktop/.
+#
+# Jobs:
+#   frontend - type check and production build of the web UI (ubuntu).
+#   rust     - cargo check / clippy / test of src-tauri on Windows, the only
+#              platform the app ships for.
+#   e2e      - Playwright suite (mocked Tauri IPC, standalone npm package in
+#              codewhale-desktop/e2e); runs only when e2e/playwright.config.ts
+#              exists, otherwise the job passes with a notice.
+name: CI
+
+on:
+  push:
+    paths:
+      - "codewhale-desktop/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "codewhale-desktop/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  NODE_VERSION: "22"
+
+jobs:
+  frontend:
+    name: Frontend (tsc + vite build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: codewhale-desktop
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: codewhale-desktop/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  rust:
+    name: Rust (check, clippy, test) on Windows
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      # Overrides any build.target-dir from a developer's .cargo/config.toml, so
+      # the artifacts land where rust-cache saves and restores them.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/codewhale-desktop/src-tauri/target
+    defaults:
+      run:
+        shell: bash
+        working-directory: codewhale-desktop
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: codewhale-desktop/package-lock.json
+
+      # tauri::generate_context!() embeds frontendDist (../dist) at compile time,
+      # so the web UI must be built before any cargo command.
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: codewhale-desktop/src-tauri -> target
+          cache-on-failure: true
+
+      # tauri-build fails when a bundle.externalBin sidecar is missing. The real
+      # codewhale app-server binary is git-ignored (~128 MB), so create empty
+      # stubs for every externalBin found in tauri*.conf.json (base or platform
+      # overlay), plus the known default, if they are not already present.
+      - name: Create sidecar stubs
+        working-directory: codewhale-desktop/src-tauri
+        run: |
+          TARGET_TRIPLE="$(rustc -vV | sed -n 's/^host: //p')"
+          export TARGET_TRIPLE
+          echo "Host target triple: ${TARGET_TRIPLE}"
+          node - <<'EOF'
+          const fs = require("fs");
+          const path = require("path");
+          const triple = process.env.TARGET_TRIPLE;
+          const ext = process.platform === "win32" ? ".exe" : "";
+          const bins = new Set(["binaries/codewhale-app-server"]);
+          for (const file of fs.readdirSync(".").filter((f) => /^tauri.*\.conf\.json$/.test(f))) {
+            try {
+              const conf = JSON.parse(fs.readFileSync(file, "utf8"));
+              for (const bin of conf?.bundle?.externalBin ?? []) bins.add(bin);
+            } catch (err) {
+              console.log(`::warning file=${file}::Could not parse ${file}: ${err.message}`);
+            }
+          }
+          for (const bin of bins) {
+            const stub = `${bin}-${triple}${ext}`;
+            if (fs.existsSync(stub)) {
+              console.log(`exists: ${stub}`);
+              continue;
+            }
+            fs.mkdirSync(path.dirname(stub), { recursive: true });
+            fs.writeFileSync(stub, "");
+            console.log(`created stub: ${stub}`);
+          }
+          EOF
+
+      - name: cargo check
+        working-directory: codewhale-desktop/src-tauri
+        run: cargo check
+
+      - name: cargo clippy
+        working-directory: codewhale-desktop/src-tauri
+        run: cargo clippy -- -D warnings
+
+      - name: cargo test
+        working-directory: codewhale-desktop/src-tauri
+        run: cargo test
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: codewhale-desktop
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The suite is a standalone npm package in e2e/ (own package.json and
+      # package-lock.json with @playwright/test). If e2e/ ever loses its
+      # package.json, Playwright is expected in the app's own devDependencies.
+      - name: Detect Playwright setup
+        id: detect
+        run: |
+          if [ ! -f e2e/playwright.config.ts ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=E2E skipped::codewhale-desktop/e2e/playwright.config.ts not found"
+            exit 0
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          if [ -f e2e/package.json ]; then
+            echo "dir=e2e" >> "$GITHUB_OUTPUT"
+            echo "config=playwright.config.ts" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=." >> "$GITHUB_OUTPUT"
+            echo "config=e2e/playwright.config.ts" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        if: steps.detect.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            codewhale-desktop/package-lock.json
+            codewhale-desktop/e2e/package-lock.json
+
+      # Needed even with a separate e2e package: the Playwright webServer runs
+      # the app's own Vite (npx vite) from codewhale-desktop/.
+      - name: Install app dependencies
+        if: steps.detect.outputs.enabled == 'true'
+        run: npm ci
+
+      - name: Install e2e dependencies
+        if: steps.detect.outputs.enabled == 'true' && steps.detect.outputs.dir != '.'
+        working-directory: codewhale-desktop/${{ steps.detect.outputs.dir }}
+        run: npm ci
+
+      - name: Resolve Playwright version
+        if: steps.detect.outputs.enabled == 'true'
+        id: pw
+        working-directory: codewhale-desktop/${{ steps.detect.outputs.dir }}
+        run: |
+          if [ ! -f node_modules/@playwright/test/package.json ]; then
+            echo "::error title=Playwright missing::@playwright/test is not in codewhale-desktop/${{ steps.detect.outputs.dir }}/package.json devDependencies (or its package-lock.json)"
+            exit 1
+          fi
+          echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Type check e2e
+        if: steps.detect.outputs.enabled == 'true' && steps.detect.outputs.dir != '.'
+        working-directory: codewhale-desktop/${{ steps.detect.outputs.dir }}
+        run: npm run typecheck --if-present
+
+      - name: Cache Playwright browsers
+        if: steps.detect.outputs.enabled == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium
+
+      - name: Install Playwright browser
+        if: steps.detect.outputs.enabled == 'true'
+        working-directory: codewhale-desktop/${{ steps.detect.outputs.dir }}
+        run: npx playwright install --with-deps chromium
+
+      # The config starts its own Vite dev server (webServer, fresh under CI=true),
+      # so no production build is needed here.
+      - name: Run Playwright tests
+        if: steps.detect.outputs.enabled == 'true'
+        working-directory: codewhale-desktop/${{ steps.detect.outputs.dir }}
+        run: npx playwright test -c ${{ steps.detect.outputs.config }}
+
+      - name: Upload Playwright report
+        if: failure() && steps.detect.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            codewhale-desktop/e2e/playwright-report
+            codewhale-desktop/e2e/test-results
+            codewhale-desktop/playwright-report
+            codewhale-desktop/test-results
+          if-no-files-found: ignore
+          retention-days: 7

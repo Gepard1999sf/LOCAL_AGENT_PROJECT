@@ -1,0 +1,24 @@
+{
+  "endpoint": "GET /v1/threads/{id}/events",
+  "phase": "offline",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_doesnotexist/events?replay_limit=4096&progress=true&since_seq=0",
+    "auth": true
+  },
+  "status": 404,
+  "response_headers": {
+    "content-type": "application/json"
+  },
+  "events": [],
+  "event_names": [],
+  "recorded_at": "2026-10-13T21:29:12+00:00",
+  "response": {
+    "body": {
+      "error": {
+        "message": "Thread not found: thr_doesnotexist",
+        "status": 404
+      }
+    }
+  }
+}

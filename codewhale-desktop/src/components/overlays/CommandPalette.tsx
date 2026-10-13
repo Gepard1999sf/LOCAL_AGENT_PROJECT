@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { useApp } from "../../store/app";
 import { api } from "../../lib/tauri";
 import { exportThread } from "../../lib/export";
+import { relativeTo } from "../../lib/paths";
 
 const EMPTY: string[] = [];
 
@@ -81,9 +82,9 @@ export function CommandPalette() {
               onSelect={run(async () => {
                 const p = await openDialog({ defaultPath: useApp.getState().settings?.workspace ?? undefined });
                 if (typeof p !== "string") return;
-                await newThread();
-                const ws = (useApp.getState().settings?.workspace ?? "").replace(/[\\/]+$/, "");
-                const rel = ws && p.toLowerCase().startsWith(ws.toLowerCase()) ? p.slice(ws.length + 1).replace(/\\/g, "/") : p;
+                if (!(await newThread())) return;
+                // The new thread is created in the selected project.
+                const rel = relativeTo(p, useApp.getState().settings?.workspace) ?? p;
                 window.dispatchEvent(new CustomEvent("composer:set", { detail: `@${rel} ` }));
               })}
             />

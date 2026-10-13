@@ -1,0 +1,50 @@
+{
+  "endpoint": "POST /v1/threads",
+  "phase": "mock",
+  "request": {
+    "method": "POST",
+    "path": "/v1/threads",
+    "auth": true,
+    "body": {
+      "model_provider": "ollama",
+      "model": "qwen3:4b",
+      "workspace": "/work/demo-project",
+      "allowed_tools": [
+        "read",
+        "write",
+        "edit",
+        "bash",
+        "todo_write"
+      ]
+    }
+  },
+  "status": 201,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "schema_version": 2,
+      "id": "thr_0a36e0abf43743d9946e29654d7d448e",
+      "created_at": "2026-10-13T21:29:50.075705243Z",
+      "updated_at": "2026-10-13T21:29:50.075705243Z",
+      "model": "qwen3:4b",
+      "model_provider": "ollama",
+      "model_provider_id": "ollama",
+      "allowed_tools": [
+        "read",
+        "write",
+        "edit",
+        "bash",
+        "todo_write"
+      ],
+      "workspace": "/work/demo-project",
+      "mode": "agent",
+      "permission_posture": "ask",
+      "allow_shell": true,
+      "trust_mode": false,
+      "auto_approve": false,
+      "archived": false
+    }
+  },
+  "elapsed_ms": 32,
+  "recorded_at": "2026-10-13T21:29:50+00:00"
+}

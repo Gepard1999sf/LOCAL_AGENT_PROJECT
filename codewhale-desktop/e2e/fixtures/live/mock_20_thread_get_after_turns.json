@@ -1,0 +1,820 @@
+{
+  "endpoint": "GET /v1/threads/{id}",
+  "phase": "mock",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_0a36e0abf43743d9946e29654d7d448e",
+    "auth": true,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "thread": {
+        "schema_version": 2,
+        "id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "created_at": "2026-10-13T21:29:50.075705243Z",
+        "updated_at": "2026-10-13T21:30:22.642731026Z",
+        "model": "qwen3:4b",
+        "model_provider": "ollama",
+        "model_provider_id": "ollama",
+        "allowed_tools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "todo_write"
+        ],
+        "workspace": "/work/demo-project",
+        "mode": "agent",
+        "permission_posture": "ask",
+        "allow_shell": true,
+        "trust_mode": false,
+        "auto_approve": false,
+        "latest_turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+        "archived": false
+      },
+      "turns": [
+        {
+          "schema_version": 2,
+          "id": "turn_04efa11653644339b9ee9208f73f12c2",
+          "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+          "status": "completed",
+          "input_summary": "Привет! Ответь одним словом.",
+          "created_at": "2026-10-13T21:29:50.627443488Z",
+          "started_at": "2026-10-13T21:29:50.669413730Z",
+          "ended_at": "2026-10-13T21:29:51.203703893Z",
+          "duration_ms": 534,
+          "usage": {
+            "input_tokens": 1200,
+            "output_tokens": 42
+          },
+          "routing_settlement": false,
+          "effective_route_usage": {
+            "input_tokens": 1200,
+            "output_tokens": 42
+          },
+          "permission_posture": "ask",
+          "mode": "agent",
+          "effective_provider": "ollama",
+          "effective_provider_id": "ollama",
+          "effective_billing_surface": "local-no-bill",
+          "effective_endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+          "effective_billing_mode": "local",
+          "effective_dispatched_at": "2026-10-13T21:29:50.772116512Z",
+          "effective_model": "qwen3:4b",
+          "modelRequestDiagnostics": {
+            "modelRequestsStarted": 1,
+            "transportRetries": 0,
+            "transparentStreamRetries": 0,
+            "streamResumes": 0,
+            "reasoningOnlyReprompts": 0,
+            "emptyStopRetries": 0
+          },
+          "item_ids": [
+            "item_6ea9968c904941ef8b2cbe5c74153f99",
+            "item_4f8c90241ac84faf888b973fa0cf2e95",
+            "item_5db17f408c5a4f0b89e4808a8c3b05b1"
+          ],
+          "steer_count": 0,
+          "workspace": {
+            "state": "settled",
+            "pre_turn_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+            "post_turn_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+            "truncated": false,
+            "omitted": 0
+          },
+          "workspace_snapshots": [
+            {
+              "kind": "pre_turn",
+              "snapshot_id": "c4ab8bc5cb75bee0140c7c4622ed7b4d8e6da8b1",
+              "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+            },
+            {
+              "kind": "post_turn",
+              "snapshot_id": "22a61318f2a78f80be1b9df2e5cca6af432f1708",
+              "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+              "changed_paths": []
+            }
+          ]
+        },
+        {
+          "schema_version": 2,
+          "id": "turn_664b139e6dba409da93ee26a8f79a33e",
+          "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+          "status": "completed",
+          "input_summary": "Прочитай файл hello.txt [tool:read]",
+          "created_at": "2026-10-13T21:29:53.205639687Z",
+          "started_at": "2026-10-13T21:29:53.248802857Z",
+          "ended_at": "2026-10-13T21:29:53.910548498Z",
+          "duration_ms": 661,
+          "usage": {
+            "input_tokens": 2400,
+            "output_tokens": 84
+          },
+          "routing_settlement": false,
+          "effective_route_usage": {
+            "input_tokens": 2400,
+            "output_tokens": 84
+          },
+          "permission_posture": "ask",
+          "mode": "agent",
+          "effective_provider": "ollama",
+          "effective_provider_id": "ollama",
+          "effective_billing_surface": "local-no-bill",
+          "effective_endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+          "effective_billing_mode": "local",
+          "effective_dispatched_at": "2026-10-13T21:29:53.336021775Z",
+          "effective_model": "qwen3:4b",
+          "modelRequestDiagnostics": {
+            "modelRequestsStarted": 2,
+            "transportRetries": 0,
+            "transparentStreamRetries": 0,
+            "streamResumes": 0,
+            "reasoningOnlyReprompts": 0,
+            "emptyStopRetries": 0
+          },
+          "operation_activity": {
+            "observed_at": "2026-10-13T21:29:53.571141717Z",
+            "active": [],
+            "last_completed": {
+              "span_id": "operation:19137b54a25ef7600d8ef826340695a6573afaacd1f460be9fca7d0d976dd692",
+              "activity_kind": "reading",
+              "action_id": "read_file",
+              "completed_at": "2026-10-13T21:29:53.571141717Z",
+              "outcome": "succeeded"
+            },
+            "overflowed": false
+          },
+          "item_ids": [
+            "item_873ed39ea9f34eabb2ee6e3384518d5a",
+            "item_830760b2a6704fd9a7cc428889777b96",
+            "item_bd44f75e0ce54c9ea7e27e0ab9243946",
+            "item_88a7a711911d4326bce357ff7f6eeac1",
+            "item_06709cdce20c4d96ac783cf3764c9d05",
+            "item_e96974e6cfd742c5863bfc41797e9543"
+          ],
+          "steer_count": 0,
+          "workspace": {
+            "state": "settled",
+            "pre_turn_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+            "post_turn_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+            "truncated": false,
+            "omitted": 0
+          },
+          "workspace_snapshots": [
+            {
+              "kind": "pre_turn",
+              "snapshot_id": "d808c475fdfce444af9ddbc07299922d955fca89",
+              "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+            },
+            {
+              "kind": "post_turn",
+              "snapshot_id": "796737a087f7999971142e1251c23ab0b07f522e",
+              "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+              "changed_paths": []
+            }
+          ]
+        },
+        {
+          "schema_version": 2,
+          "id": "turn_66d6c8a3b7674ab285b4e86490d3cd99",
+          "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+          "status": "completed",
+          "input_summary": "Создай файл created_by_agent.txt [tool:write]",
+          "created_at": "2026-10-13T21:29:55.840103964Z",
+          "started_at": "2026-10-13T21:29:55.880455634Z",
+          "ended_at": "2026-10-13T21:29:56.847324824Z",
+          "duration_ms": 966,
+          "usage": {
+            "input_tokens": 2400,
+            "output_tokens": 84
+          },
+          "routing_settlement": false,
+          "effective_route_usage": {
+            "input_tokens": 2400,
+            "output_tokens": 84
+          },
+          "permission_posture": "ask",
+          "mode": "agent",
+          "effective_provider": "ollama",
+          "effective_provider_id": "ollama",
+          "effective_billing_surface": "local-no-bill",
+          "effective_endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+          "effective_billing_mode": "local",
+          "effective_dispatched_at": "2026-10-13T21:29:55.973659855Z",
+          "effective_model": "qwen3:4b",
+          "modelRequestDiagnostics": {
+            "modelRequestsStarted": 2,
+            "transportRetries": 0,
+            "transparentStreamRetries": 0,
+            "streamResumes": 0,
+            "reasoningOnlyReprompts": 0,
+            "emptyStopRetries": 0
+          },
+          "operation_activity": {
+            "observed_at": "2026-10-13T21:29:56.375888723Z",
+            "active": [],
+            "last_completed": {
+              "span_id": "operation:43a7c468a6663dbe8871ea7e0f4d4003eac9f10a72b6de2878da333d39ec774c",
+              "activity_kind": "editing",
+              "action_id": "write_file",
+              "completed_at": "2026-10-13T21:29:56.375888723Z",
+              "outcome": "succeeded"
+            },
+            "overflowed": false
+          },
+          "item_ids": [
+            "item_e39c600f8546453a96827649ab91ff71",
+            "item_bdab8e1a46d34438a9274432f2b54356",
+            "item_a8fdaecc93ff4a8c9803736e4565510f",
+            "item_6ddcb181e3c5477a80cb0fe4a3f5e144",
+            "item_6bed63e7b70b432b8c1155128db2f661",
+            "item_0f1c22ae60c44789a9e9b4ba6a68b62e"
+          ],
+          "steer_count": 0,
+          "artifacts": [
+            {
+              "id": "file_a6ad2d2625ed92e7566a34e16e771ce8",
+              "kind": "file",
+              "path": "created_by_agent.txt",
+              "change": "created",
+              "size": 16,
+              "revision": "59b0d2840dbd75b5632a2a41cc0bd78524e9faf6ac9ae709639bedb0bc34ee4f",
+              "item_id": "item_a8fdaecc93ff4a8c9803736e4565510f",
+              "tool_call_id": "6e459008-3244-4558-8764-8c22bbec0a24",
+              "tool_name": "write",
+              "source": "tool_mutation",
+              "restore_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+              "recorded_at": "2026-10-13T21:29:56.459666892Z"
+            }
+          ],
+          "workspace": {
+            "state": "settled",
+            "pre_turn_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+            "post_turn_snapshot_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+            "truncated": false,
+            "omitted": 0
+          },
+          "workspace_snapshots": [
+            {
+              "kind": "pre_turn",
+              "snapshot_id": "358dc77a55290995453d0b6f825b968731ea3d22",
+              "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+            },
+            {
+              "kind": "tool",
+              "snapshot_id": "4b6735bb3df5ea3c2d2b12c7dcbdb9b65407e482",
+              "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+              "tool_call_id": "6e459008-3244-4558-8764-8c22bbec0a24",
+              "write_paths": [
+                "created_by_agent.txt"
+              ],
+              "changed_paths": []
+            },
+            {
+              "kind": "post_tool",
+              "snapshot_id": "c4e786ba06de55385f02bce2b7b84a0897c53e13",
+              "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+              "tool_call_id": "6e459008-3244-4558-8764-8c22bbec0a24",
+              "changed_paths": [
+                "created_by_agent.txt"
+              ]
+            },
+            {
+              "kind": "post_turn",
+              "snapshot_id": "6257cc726ed96bfc36f5954152cdcc8f20fd0dac",
+              "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+              "changed_paths": []
+            }
+          ]
+        },
+        {
+          "schema_version": 2,
+          "id": "turn_aacdad7809d44765bd985fcb13991560",
+          "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+          "status": "completed",
+          "input_summary": "Выполни команду [tool:bash]",
+          "created_at": "2026-10-13T21:30:16.310870940Z",
+          "started_at": "2026-10-13T21:30:16.352373657Z",
+          "ended_at": "2026-10-13T21:30:17.923293226Z",
+          "duration_ms": 1570,
+          "usage": {
+            "input_tokens": 2400,
+            "output_tokens": 84
+          },
+          "routing_settlement": false,
+          "effective_route_usage": {
+            "input_tokens": 2400,
+            "output_tokens": 84
+          },
+          "permission_posture": "ask",
+          "mode": "agent",
+          "effective_provider": "ollama",
+          "effective_provider_id": "ollama",
+          "effective_billing_surface": "local-no-bill",
+          "effective_endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+          "effective_billing_mode": "local",
+          "effective_dispatched_at": "2026-10-13T21:30:16.474246109Z",
+          "effective_model": "qwen3:4b",
+          "modelRequestDiagnostics": {
+            "modelRequestsStarted": 2,
+            "transportRetries": 0,
+            "transparentStreamRetries": 0,
+            "streamResumes": 0,
+            "reasoningOnlyReprompts": 0,
+            "emptyStopRetries": 0
+          },
+          "item_ids": [
+            "item_d9e3b0392fec4f628819b4e2355300d4",
+            "item_ee30aa15ab4545e7ad615c5cba4263d2",
+            "item_4dfeeeb4637644d5834dc5295727cf98",
+            "item_6150a420b4d64a12b44700765797f7c4",
+            "item_b8660825a9ad4b339d87f7eb57c5c55a",
+            "item_55b77138e9414d72a86abfaa8fc53c4c"
+          ],
+          "steer_count": 0,
+          "workspace": {
+            "state": "settled",
+            "pre_turn_snapshot_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+            "post_turn_snapshot_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+            "truncated": false,
+            "omitted": 0
+          },
+          "workspace_snapshots": [
+            {
+              "kind": "pre_turn",
+              "snapshot_id": "d60fd419cb982a9670cf058d99998a13d07042c0",
+              "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+            },
+            {
+              "kind": "post_turn",
+              "snapshot_id": "7ef2c87436dd689565395aa63b9309ec150c6b9d",
+              "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+              "changed_paths": []
+            }
+          ]
+        },
+        {
+          "schema_version": 2,
+          "id": "turn_bd690984454e45c18ece169e1e5a05c5",
+          "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+          "status": "interrupted",
+          "input_summary": "Говори медленно [slow]",
+          "created_at": "2026-10-13T21:30:19.955770862Z",
+          "started_at": "2026-10-13T21:30:19.984595115Z",
+          "ended_at": "2026-10-13T21:30:22.635459343Z",
+          "duration_ms": 2650,
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          },
+          "routing_settlement": false,
+          "effective_route_usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          },
+          "permission_posture": "ask",
+          "mode": "agent",
+          "effective_provider": "ollama",
+          "effective_provider_id": "ollama",
+          "effective_billing_surface": "local-no-bill",
+          "effective_endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+          "effective_billing_mode": "local",
+          "effective_dispatched_at": "2026-10-13T21:30:20.092262008Z",
+          "effective_model": "qwen3:4b",
+          "modelRequestDiagnostics": {
+            "modelRequestsStarted": 1,
+            "transportRetries": 0,
+            "transparentStreamRetries": 0,
+            "streamResumes": 0,
+            "reasoningOnlyReprompts": 0,
+            "emptyStopRetries": 0
+          },
+          "item_ids": [
+            "item_fa66cabfd5d847aca92b8494cad27dac",
+            "item_38ae36b171be41ecb2889a6cab201b5d",
+            "item_05ba2eaf29a74b22bbb9e1038f1c197b",
+            "item_03ce75763b04475f81df5485e4d49658"
+          ],
+          "steer_count": 0,
+          "workspace": {
+            "state": "settled",
+            "pre_turn_snapshot_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+            "post_turn_snapshot_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+            "truncated": false,
+            "omitted": 0
+          },
+          "workspace_snapshots": [
+            {
+              "kind": "pre_turn",
+              "snapshot_id": "876e8d40002cf79f12511331025ec2df1684cb82",
+              "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+            },
+            {
+              "kind": "post_turn",
+              "snapshot_id": "665dac5c798c977d513954ef5e022220ba656851",
+              "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+              "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+              "changed_paths": []
+            }
+          ]
+        }
+      ],
+      "items": [
+        {
+          "schema_version": 2,
+          "id": "item_6ea9968c904941ef8b2cbe5c74153f99",
+          "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+          "kind": "user_message",
+          "status": "completed",
+          "summary": "Привет! Ответь одним словом.",
+          "detail": "Привет! Ответь одним словом.",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:50.627443488Z",
+          "ended_at": "2026-10-13T21:29:50.627443488Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_4f8c90241ac84faf888b973fa0cf2e95",
+          "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+          "kind": "agent_reasoning",
+          "status": "completed",
+          "summary": "Пользователь поздоровался, отвечаю кратко. ",
+          "detail": "Пользователь поздоровался, отвечаю кратко. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:50.831197072Z",
+          "ended_at": "2026-10-13T21:29:50.916599338Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_5db17f408c5a4f0b89e4808a8c3b05b1",
+          "turn_id": "turn_04efa11653644339b9ee9208f73f12c2",
+          "kind": "agent_message",
+          "status": "completed",
+          "summary": "Привет! Это ответ тестовой модели (mock Ollama). ",
+          "detail": "Привет! Это ответ тестовой модели (mock Ollama). ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:50.939368912Z",
+          "ended_at": "2026-10-13T21:29:51.133107429Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_873ed39ea9f34eabb2ee6e3384518d5a",
+          "turn_id": "turn_664b139e6dba409da93ee26a8f79a33e",
+          "kind": "user_message",
+          "status": "completed",
+          "summary": "Прочитай файл hello.txt [tool:read]",
+          "detail": "Прочитай файл hello.txt [tool:read]",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:53.205639687Z",
+          "ended_at": "2026-10-13T21:29:53.205639687Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_830760b2a6704fd9a7cc428889777b96",
+          "turn_id": "turn_664b139e6dba409da93ee26a8f79a33e",
+          "kind": "agent_reasoning",
+          "status": "completed",
+          "summary": "Пользователь поздоровался, отвечаю кратко. ",
+          "detail": "Пользователь поздоровался, отвечаю кратко. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:53.374835994Z",
+          "ended_at": "2026-10-13T21:29:53.462319462Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_bd44f75e0ce54c9ea7e27e0ab9243946",
+          "turn_id": "turn_664b139e6dba409da93ee26a8f79a33e",
+          "kind": "tool_call",
+          "status": "completed",
+          "summary": "read: hello world\n",
+          "detail": "hello world\n",
+          "metadata": {
+            "evidence_routing": "inline",
+            "read_budget_bytes": 100000,
+            "size": 12,
+            "truncated": false,
+            "line_count": 2,
+            "tool_use_id": "8738dbd7-d684-40b5-bae5-80cbc52133be",
+            "tool_name": "read",
+            "tool_input": "{\"path\":\"hello.txt\"}",
+            "execution_id": "8738dbd7-d684-40b5-bae5-80cbc52133be",
+            "provider_tool_use_id": "call_mock_1",
+            "tool_result_for": "8738dbd7-d684-40b5-bae5-80cbc52133be",
+            "is_error": false
+          },
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:53.532323767Z",
+          "ended_at": "2026-10-13T21:29:53.583597720Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_88a7a711911d4326bce357ff7f6eeac1",
+          "turn_id": "turn_664b139e6dba409da93ee26a8f79a33e",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Continuing — tool results",
+          "detail": "Continuing — tool results",
+          "metadata": {
+            "visibility": "internal"
+          },
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:53.603320986Z",
+          "ended_at": "2026-10-13T21:29:53.603322885Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_06709cdce20c4d96ac783cf3764c9d05",
+          "turn_id": "turn_664b139e6dba409da93ee26a8f79a33e",
+          "kind": "agent_reasoning",
+          "status": "completed",
+          "summary": "Инструмент вернул результат, подвожу итог. ",
+          "detail": "Инструмент вернул результат, подвожу итог. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:53.661332130Z",
+          "ended_at": "2026-10-13T21:29:53.707700727Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_e96974e6cfd742c5863bfc41797e9543",
+          "turn_id": "turn_664b139e6dba409da93ee26a8f79a33e",
+          "kind": "agent_message",
+          "status": "completed",
+          "summary": "Готово: инструмент выполнен, результат получен. ",
+          "detail": "Готово: инструмент выполнен, результат получен. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:53.723282504Z",
+          "ended_at": "2026-10-13T21:29:53.844638249Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_e39c600f8546453a96827649ab91ff71",
+          "turn_id": "turn_66d6c8a3b7674ab285b4e86490d3cd99",
+          "kind": "user_message",
+          "status": "completed",
+          "summary": "Создай файл created_by_agent.txt [tool:write]",
+          "detail": "Создай файл created_by_agent.txt [tool:write]",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:55.840103964Z",
+          "ended_at": "2026-10-13T21:29:55.840103964Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_bdab8e1a46d34438a9274432f2b54356",
+          "turn_id": "turn_66d6c8a3b7674ab285b4e86490d3cd99",
+          "kind": "agent_reasoning",
+          "status": "completed",
+          "summary": "Пользователь поздоровался, отвечаю кратко. ",
+          "detail": "Пользователь поздоровался, отвечаю кратко. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:56.018939372Z",
+          "ended_at": "2026-10-13T21:29:56.110087386Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_a8fdaecc93ff4a8c9803736e4565510f",
+          "turn_id": "turn_66d6c8a3b7674ab285b4e86490d3cd99",
+          "kind": "file_change",
+          "status": "completed",
+          "summary": "write: Successfully wrote 16 bytes to created_by_agent.txt",
+          "detail": "Successfully wrote 16 bytes to created_by_agent.txt",
+          "metadata": {
+            "event": "file.mutation",
+            "lsp_diagnostics": "",
+            "mutation": {
+              "diff": "--- a/created_by_agent.txt\n+++ b/created_by_agent.txt\n@@ -0,0 +1 @@\n+hello from mock\n",
+              "files": [
+                {
+                  "path": "created_by_agent.txt",
+                  "outcome": "created",
+                  "size": 16,
+                  "sha256": "59b0d2840dbd75b5632a2a41cc0bd78524e9faf6ac9ae709639bedb0bc34ee4f"
+                }
+              ],
+              "renames": []
+            },
+            "tool_use_id": "6e459008-3244-4558-8764-8c22bbec0a24",
+            "tool_name": "write",
+            "tool_input": "{\"path\":\"created_by_agent.txt\",\"content\":\"hello from mock\\n\"}",
+            "execution_id": "6e459008-3244-4558-8764-8c22bbec0a24",
+            "provider_tool_use_id": "call_mock_1",
+            "tool_result_for": "6e459008-3244-4558-8764-8c22bbec0a24",
+            "is_error": false
+          },
+          "artifact_refs": [
+            "created_by_agent.txt"
+          ],
+          "artifacts": [
+            {
+              "id": "file_a6ad2d2625ed92e7566a34e16e771ce8",
+              "kind": "file",
+              "path": "created_by_agent.txt",
+              "change": "created",
+              "size": 16,
+              "revision": "59b0d2840dbd75b5632a2a41cc0bd78524e9faf6ac9ae709639bedb0bc34ee4f",
+              "item_id": "item_a8fdaecc93ff4a8c9803736e4565510f",
+              "tool_call_id": "6e459008-3244-4558-8764-8c22bbec0a24",
+              "tool_name": "write",
+              "source": "tool_mutation",
+              "restore_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+              "recorded_at": "2026-10-13T21:29:56.459666892Z"
+            }
+          ],
+          "started_at": "2026-10-13T21:29:56.307928788Z",
+          "ended_at": "2026-10-13T21:29:56.459666892Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_6ddcb181e3c5477a80cb0fe4a3f5e144",
+          "turn_id": "turn_66d6c8a3b7674ab285b4e86490d3cd99",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Continuing — tool results",
+          "detail": "Continuing — tool results",
+          "metadata": {
+            "visibility": "internal"
+          },
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:56.483428864Z",
+          "ended_at": "2026-10-13T21:29:56.483430814Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_6bed63e7b70b432b8c1155128db2f661",
+          "turn_id": "turn_66d6c8a3b7674ab285b4e86490d3cd99",
+          "kind": "agent_reasoning",
+          "status": "completed",
+          "summary": "Инструмент вернул результат, подвожу итог. ",
+          "detail": "Инструмент вернул результат, подвожу итог. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:56.541137526Z",
+          "ended_at": "2026-10-13T21:29:56.611335406Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_0f1c22ae60c44789a9e9b4ba6a68b62e",
+          "turn_id": "turn_66d6c8a3b7674ab285b4e86490d3cd99",
+          "kind": "agent_message",
+          "status": "completed",
+          "summary": "Готово: инструмент выполнен, результат получен. ",
+          "detail": "Готово: инструмент выполнен, результат получен. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:56.635334561Z",
+          "ended_at": "2026-10-13T21:29:56.773431393Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_d9e3b0392fec4f628819b4e2355300d4",
+          "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+          "kind": "user_message",
+          "status": "completed",
+          "summary": "Выполни команду [tool:bash]",
+          "detail": "Выполни команду [tool:bash]",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:30:16.310870940Z",
+          "ended_at": "2026-10-13T21:30:16.310870940Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_ee30aa15ab4545e7ad615c5cba4263d2",
+          "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+          "kind": "agent_reasoning",
+          "status": "completed",
+          "summary": "Пользователь поздоровался, отвечаю кратко. ",
+          "detail": "Пользователь поздоровался, отвечаю кратко. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:30:16.539145536Z",
+          "ended_at": "2026-10-13T21:30:16.627296080Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_4dfeeeb4637644d5834dc5295727cf98",
+          "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+          "kind": "tool_call",
+          "status": "failed",
+          "summary": "bash failed: Failed to authorize tool execution: Tool 'bash' denied by user — the call was not approved. Do not retry the same call; present what you intended and wait for the user's approval or new instructions.",
+          "detail": "Failed to authorize tool execution: Tool 'bash' denied by user — the call was not approved. Do not retry the same call; present what you intended and wait for the user's approval or new instructions.",
+          "metadata": {
+            "tool_use_id": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+            "tool_name": "bash",
+            "tool_input": "{\"command\":\"echo hi-from-bash\"}",
+            "execution_id": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+            "provider_tool_use_id": "call_mock_1",
+            "tool_result_for": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+            "is_error": true
+          },
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:30:16.739287543Z",
+          "ended_at": "2026-10-13T21:30:17.520629423Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_6150a420b4d64a12b44700765797f7c4",
+          "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Continuing — tool results",
+          "detail": "Continuing — tool results",
+          "metadata": {
+            "visibility": "internal"
+          },
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:30:17.543324518Z",
+          "ended_at": "2026-10-13T21:30:17.543326230Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_b8660825a9ad4b339d87f7eb57c5c55a",
+          "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+          "kind": "agent_reasoning",
+          "status": "completed",
+          "summary": "Инструмент вернул результат, подвожу итог. ",
+          "detail": "Инструмент вернул результат, подвожу итог. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:30:17.587563081Z",
+          "ended_at": "2026-10-13T21:30:17.683648581Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_55b77138e9414d72a86abfaa8fc53c4c",
+          "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+          "kind": "agent_message",
+          "status": "completed",
+          "summary": "Готово: инструмент выполнен, результат получен. ",
+          "detail": "Готово: инструмент выполнен, результат получен. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:30:17.703281009Z",
+          "ended_at": "2026-10-13T21:30:17.843423743Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_fa66cabfd5d847aca92b8494cad27dac",
+          "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+          "kind": "user_message",
+          "status": "completed",
+          "summary": "Говори медленно [slow]",
+          "detail": "Говори медленно [slow]",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:30:19.955770862Z",
+          "ended_at": "2026-10-13T21:30:19.955770862Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_38ae36b171be41ecb2889a6cab201b5d",
+          "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+          "kind": "agent_reasoning",
+          "status": "completed",
+          "summary": "Пользователь поздоровался, отвечаю кратко. ",
+          "detail": "Пользователь поздоровался, отвечаю кратко. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:30:20.129150697Z",
+          "ended_at": "2026-10-13T21:30:22.102754962Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_05ba2eaf29a74b22bbb9e1038f1c197b",
+          "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+          "kind": "agent_message",
+          "status": "interrupted",
+          "summary": "медленно ",
+          "detail": "медленно ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:30:22.127385164Z",
+          "ended_at": "2026-10-13T21:30:22.604772464Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_03ce75763b04475f81df5485e4d49658",
+          "turn_id": "turn_bd690984454e45c18ece169e1e5a05c5",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Request cancelled",
+          "detail": "Request cancelled",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:30:22.526430450Z",
+          "ended_at": "2026-10-13T21:30:22.526434226Z"
+        }
+      ],
+      "latest_seq": 172,
+      "pending_approvals": [],
+      "pending_user_inputs": [],
+      "pending_dynamic_tool_calls": [],
+      "approval_grants": []
+    }
+  },
+  "elapsed_ms": 7,
+  "recorded_at": "2026-10-13T21:30:24+00:00"
+}

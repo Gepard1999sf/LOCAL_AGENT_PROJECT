@@ -24,6 +24,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "str
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "process", "io-util", "net"] }
 futures-util = "0.3"
 getrandom = "0.3"
+# Canonical paths without the `\\?\` prefix, which editors and Explorer do not expect.
+dunce = "1"
 log = "0.4"
 
 [target.'cfg(windows)'.dependencies]

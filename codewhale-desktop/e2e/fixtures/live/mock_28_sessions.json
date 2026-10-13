@@ -1,0 +1,84 @@
+{
+  "endpoint": "GET /v1/sessions",
+  "phase": "mock",
+  "request": {
+    "method": "GET",
+    "path": "/v1/sessions?limit=50",
+    "auth": true,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "sessions": [
+        {
+          "id": "4ad5ac9c-5c81-475a-b90f-d05c81b7b330",
+          "runtime_store": {
+            "data_dir": "/home/demo/.codewhale/tasks/runtime",
+            "execution_scope": "0014d3f93888b3ae155a61530d493c9091bfd04d4388656c590c48fccf1678ec"
+          },
+          "title": "New Session",
+          "created_at": "2026-10-13T21:30:24.248136905Z",
+          "updated_at": "2026-10-13T21:30:24.248136905Z",
+          "message_count": 16,
+          "total_tokens": 0,
+          "model": "qwen3:4b",
+          "model_provider": "ollama",
+          "model_provider_id": "ollama",
+          "workspace": "/work/demo-project",
+          "mode": "agent",
+          "cost": {
+            "session_cost_usd": 0.0,
+            "session_cost_cny": 0.0,
+            "subagent_cost_usd": 0.0,
+            "subagent_cost_cny": 0.0,
+            "displayed_cost_high_water_usd": 0.0,
+            "displayed_cost_high_water_cny": 0.0,
+            "priced_turns": 0,
+            "unpriced_turns": 0,
+            "cny_priced_turns": 0,
+            "cny_unpriced_turns": 0,
+            "coverage_recorded": false
+          },
+          "cumulative_turn_secs": 0,
+          "spawn_depth": 0
+        },
+        {
+          "id": "984976c1-10a8-47e3-ae4c-428ed41c9e45",
+          "runtime_store": {
+            "data_dir": "/home/demo/.codewhale/tasks/runtime",
+            "execution_scope": "0014d3f93888b3ae155a61530d493c9091bfd04d4388656c590c48fccf1678ec"
+          },
+          "title": "New Session",
+          "created_at": "2026-10-13T21:28:37.916478839Z",
+          "updated_at": "2026-10-13T21:28:37.916478839Z",
+          "message_count": 0,
+          "total_tokens": 0,
+          "model": "qwen3:0.6b",
+          "model_provider": "ollama",
+          "model_provider_id": "ollama",
+          "workspace": "/work/demo-project",
+          "mode": "agent",
+          "cost": {
+            "session_cost_usd": 0.0,
+            "session_cost_cny": 0.0,
+            "subagent_cost_usd": 0.0,
+            "subagent_cost_cny": 0.0,
+            "displayed_cost_high_water_usd": 0.0,
+            "displayed_cost_high_water_cny": 0.0,
+            "priced_turns": 0,
+            "unpriced_turns": 0,
+            "cny_priced_turns": 0,
+            "cny_unpriced_turns": 0,
+            "coverage_recorded": false
+          },
+          "cumulative_turn_secs": 0,
+          "spawn_depth": 0
+        }
+      ]
+    }
+  },
+  "elapsed_ms": 2,
+  "recorded_at": "2026-10-13T21:30:26+00:00"
+}

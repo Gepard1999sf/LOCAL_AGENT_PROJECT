@@ -1,0 +1,890 @@
+{
+  "endpoint": "GET /v1/threads/{id}/events",
+  "phase": "mock",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_0a36e0abf43743d9946e29654d7d448e/events?replay_limit=4096&progress=true&since_seq=123",
+    "auth": true
+  },
+  "status": 200,
+  "response_headers": {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    "x-codewhale-stream-end": "1"
+  },
+  "events": [
+    {
+      "event": "stream.progress",
+      "id": null,
+      "data": {
+        "schema_version": 1,
+        "event": "stream.progress",
+        "kind": "stream.progress",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "seq": 123,
+        "state": "replaying"
+      }
+    },
+    {
+      "event": "stream.progress",
+      "id": null,
+      "data": {
+        "schema_version": 1,
+        "event": "stream.progress",
+        "kind": "stream.progress",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "seq": 123,
+        "state": "live"
+      }
+    },
+    {
+      "event": "turn.started",
+      "id": "124",
+      "data": {
+        "schema_version": 1,
+        "seq": 124,
+        "event": "turn.started",
+        "kind": "turn.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:16.356433100+00:00",
+        "created_at": "2026-10-13T21:30:16.356433100+00:00",
+        "payload": {
+          "turn": {
+            "schema_version": 2,
+            "id": "turn_aacdad7809d44765bd985fcb13991560",
+            "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+            "status": "in_progress",
+            "input_summary": "Выполни команду [tool:bash]",
+            "created_at": "2026-10-13T21:30:16.310870940Z",
+            "started_at": "2026-10-13T21:30:16.310870940Z",
+            "routing_settlement": false,
+            "permission_posture": "ask",
+            "mode": "agent",
+            "effective_provider": "ollama",
+            "effective_provider_id": "ollama",
+            "effective_model": "qwen3:4b",
+            "item_ids": [
+              "item_d9e3b0392fec4f628819b4e2355300d4"
+            ],
+            "steer_count": 0
+          }
+        },
+        "previous_seq": 123
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "125",
+      "data": {
+        "schema_version": 1,
+        "seq": 125,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_d9e3b0392fec4f628819b4e2355300d4",
+        "timestamp": "2026-10-13T21:30:16.371164683+00:00",
+        "created_at": "2026-10-13T21:30:16.371164683+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_d9e3b0392fec4f628819b4e2355300d4",
+            "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+            "kind": "user_message",
+            "status": "completed",
+            "summary": "Выполни команду [tool:bash]",
+            "detail": "Выполни команду [tool:bash]",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:16.310870940Z",
+            "ended_at": "2026-10-13T21:30:16.310870940Z"
+          }
+        },
+        "previous_seq": 124
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "126",
+      "data": {
+        "schema_version": 1,
+        "seq": 126,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_d9e3b0392fec4f628819b4e2355300d4",
+        "timestamp": "2026-10-13T21:30:16.379081387+00:00",
+        "created_at": "2026-10-13T21:30:16.379081387+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_d9e3b0392fec4f628819b4e2355300d4",
+            "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+            "kind": "user_message",
+            "status": "completed",
+            "summary": "Выполни команду [tool:bash]",
+            "detail": "Выполни команду [tool:bash]",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:16.310870940Z",
+            "ended_at": "2026-10-13T21:30:16.310870940Z"
+          }
+        },
+        "previous_seq": 125
+      }
+    },
+    {
+      "event": "turn.lifecycle",
+      "id": "127",
+      "data": {
+        "schema_version": 1,
+        "seq": 127,
+        "event": "turn.lifecycle",
+        "kind": "turn.lifecycle",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:16.395101682+00:00",
+        "created_at": "2026-10-13T21:30:16.395101682+00:00",
+        "payload": {
+          "status": "in_progress"
+        },
+        "previous_seq": 126
+      }
+    },
+    {
+      "event": "turn.workspace_snapshot",
+      "id": "128",
+      "data": {
+        "schema_version": 1,
+        "seq": 128,
+        "event": "turn.workspace_snapshot",
+        "kind": "turn.workspace_snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:16.459100133+00:00",
+        "created_at": "2026-10-13T21:30:16.459100133+00:00",
+        "payload": {
+          "kind": "pre_turn",
+          "snapshot_id": "d60fd419cb982a9670cf058d99998a13d07042c0",
+          "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+          "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+        },
+        "previous_seq": 127
+      }
+    },
+    {
+      "event": "model.tools.snapshot",
+      "id": "129",
+      "data": {
+        "schema_version": 1,
+        "seq": 129,
+        "event": "model.tools.snapshot",
+        "kind": "model.tools.snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:16.519082616+00:00",
+        "created_at": "2026-10-13T21:30:16.519082616+00:00",
+        "payload": {
+          "_shortened_by_recorder": true,
+          "payload_keys": [
+            "projection_redacted",
+            "snapshot"
+          ],
+          "tool_names": []
+        },
+        "previous_seq": 128
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "130",
+      "data": {
+        "schema_version": 1,
+        "seq": 130,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_ee30aa15ab4545e7ad615c5cba4263d2",
+        "timestamp": "2026-10-13T21:30:16.567083942+00:00",
+        "created_at": "2026-10-13T21:30:16.567083942+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_ee30aa15ab4545e7ad615c5cba4263d2",
+            "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+            "kind": "agent_reasoning",
+            "status": "in_progress",
+            "summary": "",
+            "detail": "",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:16.539145536Z"
+          }
+        },
+        "previous_seq": 129
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "131",
+      "data": {
+        "schema_version": 1,
+        "seq": 131,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_ee30aa15ab4545e7ad615c5cba4263d2",
+        "timestamp": "2026-10-13T21:30:16.623091340+00:00",
+        "created_at": "2026-10-13T21:30:16.623091340+00:00",
+        "payload": {
+          "delta": "Пользователь поздоровался, отвечаю кратко. ",
+          "kind": "agent_reasoning"
+        },
+        "previous_seq": 130
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "132",
+      "data": {
+        "schema_version": 1,
+        "seq": 132,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_ee30aa15ab4545e7ad615c5cba4263d2",
+        "timestamp": "2026-10-13T21:30:16.639080268+00:00",
+        "created_at": "2026-10-13T21:30:16.639080268+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_ee30aa15ab4545e7ad615c5cba4263d2",
+            "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+            "kind": "agent_reasoning",
+            "status": "completed",
+            "summary": "Пользователь поздоровался, отвечаю кратко. ",
+            "detail": "Пользователь поздоровался, отвечаю кратко. ",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:16.539145536Z",
+            "ended_at": "2026-10-13T21:30:16.627296080Z"
+          }
+        },
+        "previous_seq": 131
+      }
+    },
+    {
+      "event": "turn.usage",
+      "id": "133",
+      "data": {
+        "schema_version": 1,
+        "seq": 133,
+        "event": "turn.usage",
+        "kind": "turn.usage",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:16.735068968+00:00",
+        "created_at": "2026-10-13T21:30:16.735068968+00:00",
+        "payload": {
+          "usage": {
+            "input_tokens": 1200,
+            "output_tokens": 42
+          },
+          "duration_ms": 213,
+          "first_token_ms": 22,
+          "request_ms": 235,
+          "maxOutputTokens": null
+        },
+        "previous_seq": 132
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "134",
+      "data": {
+        "schema_version": 1,
+        "seq": 134,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_4dfeeeb4637644d5834dc5295727cf98",
+        "timestamp": "2026-10-13T21:30:16.763082273+00:00",
+        "created_at": "2026-10-13T21:30:16.763082273+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_4dfeeeb4637644d5834dc5295727cf98",
+            "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+            "kind": "tool_call",
+            "status": "in_progress",
+            "summary": "bash started",
+            "detail": "{\"command\":\"echo hi-from-bash\"}",
+            "metadata": {
+              "tool_use_id": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+              "tool_name": "bash",
+              "tool_input": "{\"command\":\"echo hi-from-bash\"}",
+              "execution_id": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+              "provider_tool_use_id": "call_mock_1"
+            },
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:16.739287543Z"
+          },
+          "tool": {
+            "id": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+            "name": "bash",
+            "input": {
+              "command": "echo hi-from-bash"
+            }
+          }
+        },
+        "previous_seq": 133
+      }
+    },
+    {
+      "event": "approval.required",
+      "id": "135",
+      "data": {
+        "schema_version": 1,
+        "seq": 135,
+        "event": "approval.required",
+        "kind": "approval.required",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:16.815079802+00:00",
+        "created_at": "2026-10-13T21:30:16.815079802+00:00",
+        "payload": {
+          "id": "approval_41e0e8a0f74f4441889042e1162e30bb",
+          "approval_id": "approval_41e0e8a0f74f4441889042e1162e30bb",
+          "tool_call_id": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+          "tool_name": "bash",
+          "summary": "Run `echo hi-from-bash`",
+          "description": "Execute a shell command in the workspace and return stdout and stderr. Output keeps the last 2000 lines or 50KB. An optional timeout is the seconds to wait in the foreground (default 30 seconds); a command still running then is never killed for time: it moves to the background by itself and you get its output so far, how long ago it last printed, its build phase, and a task_id, so long builds and tests need no special timeout. Find task_shell_wait with tool_search to read more or wait for it. In Ask, after a sandbox denial, retry the exact command once with sandbox_permissions (the narrowest wider mode that suffices) and a one-sentence justification; the approval prompt asks the user.",
+          "intent_summary": null
+        },
+        "previous_seq": 134
+      }
+    },
+    {
+      "event": "approval.decided",
+      "id": "136",
+      "data": {
+        "schema_version": 1,
+        "seq": 136,
+        "event": "approval.decided",
+        "kind": "approval.decided",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:17.507092074+00:00",
+        "created_at": "2026-10-13T21:30:17.507092074+00:00",
+        "payload": {
+          "approval_id": "approval_41e0e8a0f74f4441889042e1162e30bb",
+          "tool_call_id": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+          "decision": "deny",
+          "remember": false
+        },
+        "previous_seq": 135
+      }
+    },
+    {
+      "event": "item.failed",
+      "id": "137",
+      "data": {
+        "schema_version": 1,
+        "seq": 137,
+        "event": "item.failed",
+        "kind": "item.failed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_4dfeeeb4637644d5834dc5295727cf98",
+        "timestamp": "2026-10-13T21:30:17.539090997+00:00",
+        "created_at": "2026-10-13T21:30:17.539090997+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_4dfeeeb4637644d5834dc5295727cf98",
+            "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+            "kind": "tool_call",
+            "status": "failed",
+            "summary": "bash failed: Failed to authorize tool execution: Tool 'bash' denied by user — the call was not approved. Do not retry the same call; present what you intended and wait for the user's approval or new instructions.",
+            "detail": "Failed to authorize tool execution: Tool 'bash' denied by user — the call was not approved. Do not retry the same call; present what you intended and wait for the user's approval or new instructions.",
+            "metadata": {
+              "tool_use_id": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+              "tool_name": "bash",
+              "tool_input": "{\"command\":\"echo hi-from-bash\"}",
+              "execution_id": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+              "provider_tool_use_id": "call_mock_1",
+              "tool_result_for": "5801b64d-2279-4e02-8d7a-84bda036bb7d",
+              "is_error": true
+            },
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:16.739287543Z",
+            "ended_at": "2026-10-13T21:30:17.520629423Z"
+          }
+        },
+        "previous_seq": 136
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "138",
+      "data": {
+        "schema_version": 1,
+        "seq": 138,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_6150a420b4d64a12b44700765797f7c4",
+        "timestamp": "2026-10-13T21:30:17.567963792+00:00",
+        "created_at": "2026-10-13T21:30:17.567963792+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_6150a420b4d64a12b44700765797f7c4",
+            "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+            "kind": "status",
+            "status": "completed",
+            "summary": "Continuing — tool results",
+            "detail": "Continuing — tool results",
+            "metadata": {
+              "visibility": "internal"
+            },
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:17.543324518Z",
+            "ended_at": "2026-10-13T21:30:17.543326230Z"
+          }
+        },
+        "previous_seq": 137
+      }
+    },
+    {
+      "event": "model.tools.snapshot",
+      "id": "139",
+      "data": {
+        "schema_version": 1,
+        "seq": 139,
+        "event": "model.tools.snapshot",
+        "kind": "model.tools.snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:17.582495501+00:00",
+        "created_at": "2026-10-13T21:30:17.582495501+00:00",
+        "payload": {
+          "_shortened_by_recorder": true,
+          "payload_keys": [
+            "projection_redacted",
+            "snapshot"
+          ],
+          "tool_names": []
+        },
+        "previous_seq": 138
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "140",
+      "data": {
+        "schema_version": 1,
+        "seq": 140,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_b8660825a9ad4b339d87f7eb57c5c55a",
+        "timestamp": "2026-10-13T21:30:17.615076728+00:00",
+        "created_at": "2026-10-13T21:30:17.615076728+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_b8660825a9ad4b339d87f7eb57c5c55a",
+            "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+            "kind": "agent_reasoning",
+            "status": "in_progress",
+            "summary": "",
+            "detail": "",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:17.587563081Z"
+          }
+        },
+        "previous_seq": 139
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "141",
+      "data": {
+        "schema_version": 1,
+        "seq": 141,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_b8660825a9ad4b339d87f7eb57c5c55a",
+        "timestamp": "2026-10-13T21:30:17.677298269+00:00",
+        "created_at": "2026-10-13T21:30:17.677298269+00:00",
+        "payload": {
+          "delta": "Инструмент вернул результат, подвожу итог. ",
+          "kind": "agent_reasoning"
+        },
+        "previous_seq": 140
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "142",
+      "data": {
+        "schema_version": 1,
+        "seq": 142,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_b8660825a9ad4b339d87f7eb57c5c55a",
+        "timestamp": "2026-10-13T21:30:17.699081111+00:00",
+        "created_at": "2026-10-13T21:30:17.699081111+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_b8660825a9ad4b339d87f7eb57c5c55a",
+            "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+            "kind": "agent_reasoning",
+            "status": "completed",
+            "summary": "Инструмент вернул результат, подвожу итог. ",
+            "detail": "Инструмент вернул результат, подвожу итог. ",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:17.587563081Z",
+            "ended_at": "2026-10-13T21:30:17.683648581Z"
+          }
+        },
+        "previous_seq": 141
+      }
+    },
+    {
+      "event": "item.started",
+      "id": "143",
+      "data": {
+        "schema_version": 1,
+        "seq": 143,
+        "event": "item.started",
+        "kind": "item.started",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_55b77138e9414d72a86abfaa8fc53c4c",
+        "timestamp": "2026-10-13T21:30:17.723072941+00:00",
+        "created_at": "2026-10-13T21:30:17.723072941+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_55b77138e9414d72a86abfaa8fc53c4c",
+            "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+            "kind": "agent_message",
+            "status": "in_progress",
+            "summary": "",
+            "detail": "",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:17.703281009Z"
+          }
+        },
+        "previous_seq": 142
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "144",
+      "data": {
+        "schema_version": 1,
+        "seq": 144,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_55b77138e9414d72a86abfaa8fc53c4c",
+        "timestamp": "2026-10-13T21:30:17.783096896+00:00",
+        "created_at": "2026-10-13T21:30:17.783096896+00:00",
+        "payload": {
+          "delta": "Готово: инструмент выполнен, ",
+          "kind": "agent_message"
+        },
+        "previous_seq": 143
+      }
+    },
+    {
+      "event": "item.delta",
+      "id": "145",
+      "data": {
+        "schema_version": 1,
+        "seq": 145,
+        "event": "item.delta",
+        "kind": "item.delta",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_55b77138e9414d72a86abfaa8fc53c4c",
+        "timestamp": "2026-10-13T21:30:17.835490468+00:00",
+        "created_at": "2026-10-13T21:30:17.835490468+00:00",
+        "payload": {
+          "delta": "результат получен. ",
+          "kind": "agent_message"
+        },
+        "previous_seq": 144
+      }
+    },
+    {
+      "event": "turn.usage",
+      "id": "146",
+      "data": {
+        "schema_version": 1,
+        "seq": 146,
+        "event": "turn.usage",
+        "kind": "turn.usage",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:17.840666273+00:00",
+        "created_at": "2026-10-13T21:30:17.840666273+00:00",
+        "payload": {
+          "usage": {
+            "input_tokens": 1200,
+            "output_tokens": 42
+          },
+          "duration_ms": 305,
+          "first_token_ms": 8,
+          "request_ms": 313,
+          "maxOutputTokens": null
+        },
+        "previous_seq": 145
+      }
+    },
+    {
+      "event": "item.completed",
+      "id": "147",
+      "data": {
+        "schema_version": 1,
+        "seq": 147,
+        "event": "item.completed",
+        "kind": "item.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": "item_55b77138e9414d72a86abfaa8fc53c4c",
+        "timestamp": "2026-10-13T21:30:17.859068880+00:00",
+        "created_at": "2026-10-13T21:30:17.859068880+00:00",
+        "payload": {
+          "item": {
+            "schema_version": 2,
+            "id": "item_55b77138e9414d72a86abfaa8fc53c4c",
+            "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+            "kind": "agent_message",
+            "status": "completed",
+            "summary": "Готово: инструмент выполнен, результат получен. ",
+            "detail": "Готово: инструмент выполнен, результат получен. ",
+            "artifact_refs": [],
+            "started_at": "2026-10-13T21:30:17.703281009Z",
+            "ended_at": "2026-10-13T21:30:17.843423743Z"
+          }
+        },
+        "previous_seq": 146
+      }
+    },
+    {
+      "event": "model.tools.snapshot",
+      "id": "148",
+      "data": {
+        "schema_version": 1,
+        "seq": 148,
+        "event": "model.tools.snapshot",
+        "kind": "model.tools.snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:17.884824326+00:00",
+        "created_at": "2026-10-13T21:30:17.884824326+00:00",
+        "payload": {
+          "_shortened_by_recorder": true,
+          "payload_keys": [
+            "projection_redacted",
+            "snapshot"
+          ],
+          "tool_names": []
+        },
+        "previous_seq": 147
+      }
+    },
+    {
+      "event": "turn.workspace_snapshot",
+      "id": "149",
+      "data": {
+        "schema_version": 1,
+        "seq": 149,
+        "event": "turn.workspace_snapshot",
+        "kind": "turn.workspace_snapshot",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:17.919085897+00:00",
+        "created_at": "2026-10-13T21:30:17.919085897+00:00",
+        "payload": {
+          "kind": "post_turn",
+          "snapshot_id": "7ef2c87436dd689565395aa63b9309ec150c6b9d",
+          "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+          "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+          "changed_paths": []
+        },
+        "previous_seq": 148
+      }
+    },
+    {
+      "event": "turn.completed",
+      "id": "150",
+      "data": {
+        "schema_version": 1,
+        "seq": 150,
+        "event": "turn.completed",
+        "kind": "turn.completed",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:17.971080324+00:00",
+        "created_at": "2026-10-13T21:30:17.971080324+00:00",
+        "payload": {
+          "turn": {
+            "schema_version": 2,
+            "id": "turn_aacdad7809d44765bd985fcb13991560",
+            "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+            "status": "completed",
+            "input_summary": "Выполни команду [tool:bash]",
+            "created_at": "2026-10-13T21:30:16.310870940Z",
+            "started_at": "2026-10-13T21:30:16.352373657Z",
+            "ended_at": "2026-10-13T21:30:17.923293226Z",
+            "duration_ms": 1570,
+            "usage": {
+              "input_tokens": 2400,
+              "output_tokens": 84
+            },
+            "routing_settlement": false,
+            "effective_route_usage": {
+              "input_tokens": 2400,
+              "output_tokens": 84
+            },
+            "permission_posture": "ask",
+            "mode": "agent",
+            "effective_provider": "ollama",
+            "effective_provider_id": "ollama",
+            "effective_billing_surface": "local-no-bill",
+            "effective_endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+            "effective_billing_mode": "local",
+            "effective_dispatched_at": "2026-10-13T21:30:16.474246109Z",
+            "effective_model": "qwen3:4b",
+            "modelRequestDiagnostics": {
+              "modelRequestsStarted": 2,
+              "transportRetries": 0,
+              "transparentStreamRetries": 0,
+              "streamResumes": 0,
+              "reasoningOnlyReprompts": 0,
+              "emptyStopRetries": 0
+            },
+            "item_ids": [
+              "item_d9e3b0392fec4f628819b4e2355300d4",
+              "item_ee30aa15ab4545e7ad615c5cba4263d2",
+              "item_4dfeeeb4637644d5834dc5295727cf98",
+              "item_6150a420b4d64a12b44700765797f7c4",
+              "item_b8660825a9ad4b339d87f7eb57c5c55a",
+              "item_55b77138e9414d72a86abfaa8fc53c4c"
+            ],
+            "steer_count": 0,
+            "workspace": {
+              "state": "pending",
+              "pre_turn_snapshot_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+              "truncated": false,
+              "omitted": 0
+            },
+            "workspace_snapshots": [
+              {
+                "kind": "pre_turn",
+                "snapshot_id": "d60fd419cb982a9670cf058d99998a13d07042c0",
+                "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+                "session_id": "thr_0a36e0abf43743d9946e29654d7d448e"
+              },
+              {
+                "kind": "post_turn",
+                "snapshot_id": "7ef2c87436dd689565395aa63b9309ec150c6b9d",
+                "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+                "session_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+                "changed_paths": []
+              }
+            ]
+          }
+        },
+        "previous_seq": 149
+      }
+    },
+    {
+      "event": "turn.artifacts",
+      "id": "151",
+      "data": {
+        "schema_version": 1,
+        "seq": 151,
+        "event": "turn.artifacts",
+        "kind": "turn.artifacts",
+        "thread_id": "thr_0a36e0abf43743d9946e29654d7d448e",
+        "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+        "item_id": null,
+        "timestamp": "2026-10-13T21:30:18.003084183+00:00",
+        "created_at": "2026-10-13T21:30:18.003084183+00:00",
+        "payload": {
+          "turn_id": "turn_aacdad7809d44765bd985fcb13991560",
+          "workspace": {
+            "state": "settled",
+            "pre_turn_snapshot_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+            "post_turn_snapshot_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+            "truncated": false,
+            "omitted": 0
+          },
+          "artifacts": []
+        },
+        "previous_seq": 150
+      }
+    }
+  ],
+  "event_names": [
+    "stream.progress",
+    "stream.progress",
+    "turn.started",
+    "item.started",
+    "item.completed",
+    "turn.lifecycle",
+    "turn.workspace_snapshot",
+    "model.tools.snapshot",
+    "item.started",
+    "item.delta",
+    "item.completed",
+    "turn.usage",
+    "item.started",
+    "approval.required",
+    "approval.decided",
+    "item.failed",
+    "item.completed",
+    "model.tools.snapshot",
+    "item.started",
+    "item.delta",
+    "item.completed",
+    "item.started",
+    "item.delta",
+    "item.delta",
+    "turn.usage",
+    "item.completed",
+    "model.tools.snapshot",
+    "turn.workspace_snapshot",
+    "turn.completed",
+    "turn.artifacts"
+  ],
+  "recorded_at": "2026-10-13T21:30:19+00:00"
+}

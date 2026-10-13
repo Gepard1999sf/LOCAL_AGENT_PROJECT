@@ -31,7 +31,6 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "msi"],
-    "externalBin": ["binaries/codewhale-app-server"],
     "shortDescription": "CodeWhale Desktop",
     "longDescription": "Desktop client for the CodeWhale coding agent running fully local on Ollama.",
     "icon": [

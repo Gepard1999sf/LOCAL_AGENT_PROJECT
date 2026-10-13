@@ -1,0 +1,135 @@
+{
+  "endpoint": "GET /v1/threads/{id} (approval pending)",
+  "phase": "extra",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_be79ced7fcd149afbeccd703125157ef",
+    "auth": true,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "thread": {
+        "schema_version": 2,
+        "id": "thr_be79ced7fcd149afbeccd703125157ef",
+        "created_at": "2026-10-13T21:31:45.797713071Z",
+        "updated_at": "2026-10-13T21:31:46.319266236Z",
+        "model": "qwen3:4b",
+        "model_provider": "ollama",
+        "model_provider_id": "ollama",
+        "allowed_tools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "todo_write"
+        ],
+        "workspace": "/work/demo-project",
+        "mode": "agent",
+        "permission_posture": "ask",
+        "allow_shell": true,
+        "trust_mode": false,
+        "auto_approve": false,
+        "latest_turn_id": "turn_93d22273e327483fbe13e8dcc4f8ef5e",
+        "archived": false
+      },
+      "turns": [
+        {
+          "schema_version": 2,
+          "id": "turn_93d22273e327483fbe13e8dcc4f8ef5e",
+          "thread_id": "thr_be79ced7fcd149afbeccd703125157ef",
+          "status": "in_progress",
+          "input_summary": "Выполни команду [tool:bash]",
+          "created_at": "2026-10-13T21:31:46.319266236Z",
+          "started_at": "2026-10-13T21:31:46.349287841Z",
+          "routing_settlement": false,
+          "permission_posture": "ask",
+          "mode": "agent",
+          "effective_provider": "ollama",
+          "effective_provider_id": "ollama",
+          "effective_billing_surface": "local-no-bill",
+          "effective_endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+          "effective_billing_mode": "local",
+          "effective_dispatched_at": "2026-10-13T21:31:46.437532519Z",
+          "effective_model": "qwen3:4b",
+          "item_ids": [
+            "item_421c74b86a8b4ccd907d4ccb30468f4e",
+            "item_54a683ec73bf451f867e4f2aeef33551",
+            "item_e7b87672aff744ce8503e24ca3606414"
+          ],
+          "steer_count": 0,
+          "workspace_snapshots": [
+            {
+              "kind": "pre_turn",
+              "snapshot_id": "ecaf0ba7bfc2d600b33a5c9c189ada0300f69dc8",
+              "tree_id": "16f7252c5f1e93be31bb6bc13696f725f1763cc3",
+              "session_id": "thr_be79ced7fcd149afbeccd703125157ef"
+            }
+          ]
+        }
+      ],
+      "items": [
+        {
+          "schema_version": 2,
+          "id": "item_421c74b86a8b4ccd907d4ccb30468f4e",
+          "turn_id": "turn_93d22273e327483fbe13e8dcc4f8ef5e",
+          "kind": "user_message",
+          "status": "completed",
+          "summary": "Выполни команду [tool:bash]",
+          "detail": "Выполни команду [tool:bash]",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:31:46.319266236Z",
+          "ended_at": "2026-10-13T21:31:46.319266236Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_54a683ec73bf451f867e4f2aeef33551",
+          "turn_id": "turn_93d22273e327483fbe13e8dcc4f8ef5e",
+          "kind": "agent_reasoning",
+          "status": "completed",
+          "summary": "Пользователь поздоровался, отвечаю кратко. ",
+          "detail": "Пользователь поздоровался, отвечаю кратко. ",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:31:46.482333717Z",
+          "ended_at": "2026-10-13T21:31:46.571339998Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_e7b87672aff744ce8503e24ca3606414",
+          "turn_id": "turn_93d22273e327483fbe13e8dcc4f8ef5e",
+          "kind": "tool_call",
+          "status": "in_progress",
+          "summary": "bash started",
+          "detail": "{\"command\":\"echo hi-from-bash\"}",
+          "metadata": {
+            "tool_use_id": "ecf8007e-a67c-4404-98d6-65fb03f7d1c5",
+            "tool_name": "bash",
+            "tool_input": "{\"command\":\"echo hi-from-bash\"}",
+            "execution_id": "ecf8007e-a67c-4404-98d6-65fb03f7d1c5",
+            "provider_tool_use_id": "call_mock_1"
+          },
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:31:46.679740221Z"
+        }
+      ],
+      "latest_seq": 190,
+      "pending_approvals": [
+        {
+          "id": "approval_717ee72058804c2994d6a6631a488e05",
+          "turn_id": "turn_93d22273e327483fbe13e8dcc4f8ef5e",
+          "tool_name": "bash",
+          "description": "Execute a shell command in the workspace and return stdout and stderr. Output keeps the last 2000 lines or 50KB. An optional timeout is the seconds to wait in the foreground (default 30 seconds); a command still running then is never killed for time: it moves to the background by itself and you get its output so far, how long ago it last printed, its build phase, and a task_id, so long builds and tests need no special timeout. Find task_shell_wait with tool_search to read more or wait for it. In Ask, after a sandbox denial, retry the exact command once with sandbox_permissions (the narrowest wider mode that suffices) and a one-sentence justification; the approval prompt asks the user.",
+          "tool_call_id": "ecf8007e-a67c-4404-98d6-65fb03f7d1c5",
+          "summary": "Run `echo hi-from-bash`"
+        }
+      ],
+      "pending_user_inputs": [],
+      "pending_dynamic_tool_calls": [],
+      "approval_grants": []
+    }
+  },
+  "elapsed_ms": 6,
+  "recorded_at": "2026-10-13T21:31:47+00:00"
+}

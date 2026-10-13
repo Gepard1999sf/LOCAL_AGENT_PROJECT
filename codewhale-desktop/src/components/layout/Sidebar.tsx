@@ -18,7 +18,7 @@ import {
   Loader2,
   ShieldQuestion,
 } from "lucide-react";
-import { useApp } from "../../store/app";
+import { summaryTurnActive, useApp } from "../../store/app";
 import { useThreads } from "../../store/threads";
 import { api } from "../../lib/tauri";
 import { basename, dateGroup, fmtTime, type DateGroup } from "../../lib/format";
@@ -45,13 +45,6 @@ function Highlight({ text, q }: { text: string; q: string }) {
 
 function MenuItems({ s, onRename, onDelete, Item }: { s: ThreadSummary; onRename: () => void; onDelete: () => void; Item: any }) {
   const fork = useApp((st) => st.forkThread);
-  const ensureLoaded = async () => {
-    if (!useThreads.getState().threads[s.id]) {
-      useThreads.getState().reset(s.id);
-      await api.subscribe(s.id, 0);
-      await new Promise((r) => setTimeout(r, 600));
-    }
-  };
   return (
     <>
       <Item className={menuItem} onSelect={onRename}>
@@ -60,10 +53,10 @@ function MenuItems({ s, onRename, onDelete, Item }: { s: ThreadSummary; onRename
       <Item className={menuItem} onSelect={() => fork(s.id)}>
         <Copy size={13} /> Дублировать
       </Item>
-      <Item className={menuItem} onSelect={async () => { await ensureLoaded(); exportThread(s.id, "md"); }}>
+      <Item className={menuItem} onSelect={() => exportThread(s.id, "md")}>
         <Download size={13} /> Экспорт в Markdown
       </Item>
-      <Item className={menuItem} onSelect={async () => { await ensureLoaded(); exportThread(s.id, "json"); }}>
+      <Item className={menuItem} onSelect={() => exportThread(s.id, "json")}>
         <FileJson size={13} /> Экспорт в JSON
       </Item>
       <div className="my-1 h-px bg-line" />
@@ -74,11 +67,11 @@ function MenuItems({ s, onRename, onDelete, Item }: { s: ThreadSummary; onRename
   );
 }
 
-const SessionItem = memo(function SessionItem({ s, active, q, index }: { s: ThreadSummary; active: boolean; q: string; index: number }) {
+const SessionItem = memo(function SessionItem({ s, active, q, hotkey }: { s: ThreadSummary; active: boolean; q: string; hotkey?: number }) {
   const openThread = useApp((st) => st.openThread);
   const rename = useApp((st) => st.renameThread);
   const archive = useApp((st) => st.archiveThread);
-  const running = useThreads((st) => !!st.threads[s.id]?.activeTurnId) || s.latest_turn_status === "in_progress";
+  const running = useThreads((st) => !!st.threads[s.id]?.activeTurnId) || summaryTurnActive(s);
   const [editing, setEditing] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [title, setTitle] = useState(s.title);
@@ -140,7 +133,7 @@ const SessionItem = memo(function SessionItem({ s, active, q, index }: { s: Thre
             <Highlight text={s.title || "Без названия"} q={q} />
           </span>
         )}
-        {index < 9 && <span className="hidden text-[10px] text-fg3 group-hover/item:inline">Ctrl+{index + 1}</span>}
+        {hotkey != null && <span className="hidden text-[10px] text-fg3 group-hover/item:inline">Ctrl+{hotkey}</span>}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button
@@ -213,6 +206,7 @@ export function Sidebar() {
   const resumeSession = useApp((s) => s.resumeSession);
   const setOverlay = useApp((s) => s.setOverlay);
   const toggleSidebar = useApp((s) => s.toggleSidebar);
+  const setSidebarOrder = useApp((s) => s.setSidebarOrder);
   const [remoteHits, setRemoteHits] = useState<string[] | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -263,6 +257,16 @@ export function Sidebar() {
     return g;
   }, [filtered]);
 
+  // Sessions in the order listed (the collapsed rail is unfiltered). Ctrl+1..9
+  // (useShortcuts) open the first nine of the order published to the store.
+  const ordered = useMemo(
+    () => (collapsed ? summaries : GROUPS.flatMap((g) => grouped.get(g) ?? [])),
+    [collapsed, summaries, grouped],
+  );
+  const hotkeys = useMemo(() => new Map(ordered.slice(0, 9).map((s, i) => [s.id, i + 1])), [ordered]);
+  useEffect(() => setSidebarOrder(ordered.map((s) => s.id)), [ordered, setSidebarOrder]);
+  useEffect(() => () => setSidebarOrder(null), [setSidebarOrder]);
+
   if (collapsed) {
     return (
       <aside className="panel-transition flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-elevated py-2">
@@ -287,7 +291,6 @@ export function Sidebar() {
     );
   }
 
-  let flatIndex = 0;
   return (
     <aside className="panel-transition flex w-[260px] shrink-0 flex-col border-r border-line bg-elevated">
       <div className="p-2">
@@ -332,7 +335,7 @@ export function Sidebar() {
                 <span className="h-px flex-1 bg-line-muted" />
               </div>
               {list.map((s) => (
-                <SessionItem key={s.id} s={s} active={s.id === activeId} q={search.trim()} index={flatIndex++} />
+                <SessionItem key={s.id} s={s} active={s.id === activeId} q={search.trim()} hotkey={hotkeys.get(s.id)} />
               ))}
             </div>
           );

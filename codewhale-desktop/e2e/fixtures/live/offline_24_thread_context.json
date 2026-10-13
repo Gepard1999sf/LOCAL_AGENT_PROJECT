@@ -1,0 +1,32 @@
+{
+  "endpoint": "GET /v1/threads/{id}/context",
+  "phase": "offline",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_66897057f8ab4643be149a7d962d9407/context",
+    "auth": true,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "thread_id": "thr_66897057f8ab4643be149a7d962d9407",
+      "model": "qwen3:4b",
+      "provider": "ollama",
+      "model_provider_id": "ollama",
+      "live": true,
+      "window_tokens": 8192,
+      "input_tokens": 3000,
+      "billed_input_tokens": null,
+      "output_cap_tokens": 2048,
+      "input_budget_ceiling": 5120,
+      "available_input_tokens": 2120,
+      "compaction_trigger_tokens": 5120,
+      "usage_percent": 36.62109375,
+      "pressure": "low"
+    }
+  },
+  "elapsed_ms": 207,
+  "recorded_at": "2026-10-13T21:28:37+00:00"
+}

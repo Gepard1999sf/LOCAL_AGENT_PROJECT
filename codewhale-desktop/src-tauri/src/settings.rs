@@ -3,7 +3,7 @@
 //! The frontend owns most keys (theme, hotkeys, auto-approve rules); Rust only
 //! reads the few it needs to start processes (binary path, Ollama URL, telemetry).
 
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
@@ -69,10 +69,10 @@ impl Settings {
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("settings.json");
         let mut data = defaults();
-        if let Ok(text) = std::fs::read_to_string(&path) {
-            if let Ok(saved) = serde_json::from_str::<Value>(&text) {
-                merge(&mut data, &saved);
-            }
+        if let Ok(text) = std::fs::read_to_string(&path)
+            && let Ok(saved) = serde_json::from_str::<Value>(&text)
+        {
+            merge(&mut data, &saved);
         }
         // First run: default project folder is the existing CodeWhale workspace.
         if data.get("workspace").is_none_or(Value::is_null) {
@@ -143,9 +143,4 @@ pub fn settings_set(patch: Value, state: tauri::State<'_, Settings>) -> Result<V
         m.remove("_file");
     }
     state.update(clean)
-}
-
-#[allow(dead_code)]
-pub fn empty() -> Map<String, Value> {
-    Map::new()
 }

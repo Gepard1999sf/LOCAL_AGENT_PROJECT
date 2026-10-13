@@ -1,20 +1,56 @@
 import { useEffect } from "react";
 import { api, onCwEvent, onCwStream, onRuntimeLog, onRuntimeStatus, subscribeAll } from "../lib/tauri";
 import { useApp } from "../store/app";
-import { enqueueEvent, useThreads } from "../store/threads";
+import { enqueueEvent, isStreamLive, useThreads } from "../store/threads";
+import { effectiveCtx } from "../lib/models";
 import type { CwEventEnvelope } from "../lib/types";
 
 const PREFERRED_MODELS = ["qwen3-4b-32k", "qwen3.5-4b-64k", "qwen3-8b-16k"];
+const TURN_END = new Set(["turn.completed", "turn.failed", "turn.interrupted", "turn.canceled"]);
+const TURN_END_STATUS = new Set(["completed", "failed", "interrupted", "canceled"]);
+
+// Live events coalesce into one trailing refresh per window, so a burst of turn
+// ends costs one request per endpoint, not one per event.
+const REFRESH_WINDOW_MS = 500;
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+let refreshList = false;
+let releaseStreams = false;
+const refreshCtx = new Set<string>();
+
+function scheduleRefresh(opts: { list?: boolean; context?: string; release?: boolean }) {
+  if (opts.list) refreshList = true;
+  if (opts.context) refreshCtx.add(opts.context);
+  if (opts.release) releaseStreams = true;
+  if (refreshTimer) return;
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    const app = useApp.getState();
+    if (refreshList) app.refreshThreads();
+    for (const id of refreshCtx) app.refreshContext(id);
+    // By now the batched store has applied the turn end, so idle streams are visible as such.
+    if (releaseStreams) app.releaseIdleStreams();
+    refreshList = false;
+    releaseStreams = false;
+    refreshCtx.clear();
+  }, REFRESH_WINDOW_MS);
+}
 
 function onEvent(env: CwEventEnvelope) {
+  // Classify before enqueueing: replayed history must not trigger refreshes or auto-approval.
+  const live = isStreamLive(env.threadId);
   enqueueEvent(env);
+  if (!live) {
+    // A catch-up replay may have ended a turn (e.g. after a runtime restart): re-check streams.
+    if (env.event === "stream.progress" && isStreamLive(env.threadId)) scheduleRefresh({ release: true });
+    return;
+  }
   const app = useApp.getState();
   switch (env.event) {
     case "approval.required": {
       // Auto-approve only live requests (never replayed history) and only tools the user allowed.
       setTimeout(() => {
         const t = useThreads.getState().threads[env.threadId];
-        if (!t?.live) return;
+        if (!t) return;
         let p: any;
         try {
           p = JSON.parse(env.data).payload;
@@ -30,15 +66,21 @@ function onEvent(env: CwEventEnvelope) {
       }, 60);
       break;
     }
-    case "turn.completed":
-    case "turn.failed":
-    case "turn.interrupted":
-      app.refreshThreads();
-      app.refreshContext(env.threadId);
+    case "turn.lifecycle": {
+      let status: unknown;
+      try {
+        status = JSON.parse(env.data).payload?.status;
+      } catch {
+        break;
+      }
+      if (typeof status === "string" && TURN_END_STATUS.has(status)) scheduleRefresh({ release: true });
       break;
+    }
     case "thread.updated":
-      app.refreshThreads();
+      scheduleRefresh({ list: true });
       break;
+    default:
+      if (TURN_END.has(env.event)) scheduleRefresh({ list: true, context: env.threadId, release: true });
   }
 }
 
@@ -100,7 +142,7 @@ export function useBootstrap() {
       if (!st.settings?.defaultModel || !st.models.some((m) => m.name === st.settings?.defaultModel)) {
         const pick =
           PREFERRED_MODELS.find((n) => st.models.some((m) => m.name === n)) ??
-          st.models.find((m) => m.capabilities.includes("tools") && (m.numCtx ?? 0) >= 16384)?.name ??
+          st.models.find((m) => m.capabilities.includes("tools") && (effectiveCtx(m) ?? 0) >= 16384)?.name ??
           st.models.find((m) => m.capabilities.includes("tools"))?.name;
         if (pick) await st.updateSettings({ defaultModel: pick });
       }

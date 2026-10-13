@@ -1,0 +1,22 @@
+{
+  "endpoint": "POST /v1/sessions/{id}/resume-thread (unknown id)",
+  "phase": "offline",
+  "request": {
+    "method": "POST",
+    "path": "/v1/sessions/sess_doesnotexist/resume-thread",
+    "auth": true,
+    "body": {}
+  },
+  "status": 404,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "error": {
+        "message": "Session 'sess_doesnotexist' not found",
+        "status": 404
+      }
+    }
+  },
+  "elapsed_ms": 1,
+  "recorded_at": "2026-10-13T21:29:08+00:00"
+}

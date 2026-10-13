@@ -1,0 +1,25 @@
+{
+  "endpoint": "POST /v1/threads",
+  "phase": "mock",
+  "request": {
+    "method": "POST",
+    "path": "/v1/threads",
+    "auth": true,
+    "body": {
+      "model_provider": "ollama"
+    }
+  },
+  "status": 400,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "error": {
+        "message": "Local Ollama has no fresh model catalog for this endpoint; select an explicit model or refresh its catalog.",
+        "status": 400
+      }
+    }
+  },
+  "elapsed_ms": 3,
+  "recorded_at": "2026-10-13T21:29:50+00:00",
+  "note": "Same body as offline_12, but with an Ollama catalog reachable."
+}

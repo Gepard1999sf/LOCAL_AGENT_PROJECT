@@ -1,0 +1,66 @@
+{
+  "endpoint": "GET /v1/threads/summary",
+  "phase": "offline",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/summary?limit=100&search=qwen",
+    "auth": true,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": [
+      {
+        "id": "thr_237c47944dc54b34a2144c48015a65e4",
+        "title": "New Thread",
+        "preview": "New Thread",
+        "model": "qwen3:4b",
+        "mode": "agent",
+        "workspace": "/work/demo-project",
+        "branch": null,
+        "head": null,
+        "dirty": true,
+        "archived": false,
+        "updated_at": "2026-10-13T21:28:37.510814166Z",
+        "latest_turn_id": null,
+        "latest_turn_status": null,
+        "pending_attention_count": 0
+      },
+      {
+        "id": "thr_f28c75a3585d4a39a5e8128d1e5987c8",
+        "title": "New Thread",
+        "preview": "New Thread",
+        "model": "qwen3:4b",
+        "mode": "agent",
+        "workspace": "/work/demo-project",
+        "branch": null,
+        "head": null,
+        "dirty": true,
+        "archived": false,
+        "updated_at": "2026-10-13T21:28:37.485352659Z",
+        "latest_turn_id": null,
+        "latest_turn_status": null,
+        "pending_attention_count": 0
+      },
+      {
+        "id": "thr_66897057f8ab4643be149a7d962d9407",
+        "title": "New Thread",
+        "preview": "New Thread",
+        "model": "qwen3:4b",
+        "mode": "agent",
+        "workspace": "/work/demo-project",
+        "branch": null,
+        "head": null,
+        "dirty": true,
+        "archived": false,
+        "updated_at": "2026-10-13T21:28:37.459933603Z",
+        "latest_turn_id": null,
+        "latest_turn_status": null,
+        "pending_attention_count": 0
+      }
+    ]
+  },
+  "elapsed_ms": 24,
+  "recorded_at": "2026-10-13T21:28:37+00:00"
+}

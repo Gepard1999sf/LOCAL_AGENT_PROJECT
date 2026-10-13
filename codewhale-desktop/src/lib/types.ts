@@ -94,6 +94,46 @@ export interface ItemRecord {
   ended_at?: string;
 }
 
+/** GET /v1/threads/{id}: the canonical snapshot, independent of the event replay window. */
+export interface ThreadDetail {
+  thread: ThreadRecord;
+  turns: TurnRecord[];
+  items: ItemRecord[];
+  latest_seq: number;
+  pending_approvals?: Array<{
+    id: string;
+    turn_id: string;
+    tool_name: string;
+    description: string;
+    intent_summary?: string;
+    tool_call_id?: string;
+    summary?: string;
+  }>;
+  pending_user_inputs?: Array<{ id: string; turn_id: string; request: { questions: UserInputQuestion[] } }>;
+}
+
+// request_user_input tool (user_input.required payload: { id, request: { questions }, delivery_error? }).
+export interface UserInputOption {
+  label: string;
+  description: string;
+}
+
+export interface UserInputQuestion {
+  header: string;
+  id: string;
+  question: string;
+  options: UserInputOption[];
+  allow_free_text?: boolean;
+  multi_select?: boolean;
+}
+
+/** One entry of POST /v1/user-input/{thread_id}/{input_id} `answers`; free text uses label "Other". */
+export interface UserInputAnswer {
+  id: string;
+  label: string;
+  value: string;
+}
+
 export interface ContextInfo {
   thread_id: string;
   model: string;

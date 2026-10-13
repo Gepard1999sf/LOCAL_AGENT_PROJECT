@@ -1,0 +1,25 @@
+{
+  "endpoint": "POST /v1/approvals/{approval_id}",
+  "phase": "mock",
+  "request": {
+    "method": "POST",
+    "path": "/v1/approvals/approval_41e0e8a0f74f4441889042e1162e30bb",
+    "auth": true,
+    "body": {
+      "decision": "deny",
+      "remember": false
+    }
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "ok": true,
+      "approval_id": "approval_41e0e8a0f74f4441889042e1162e30bb",
+      "decision": "deny",
+      "delivered": true
+    }
+  },
+  "elapsed_ms": 2,
+  "recorded_at": "2026-10-13T21:30:17+00:00"
+}

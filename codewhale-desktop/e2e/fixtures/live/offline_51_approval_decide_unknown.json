@@ -1,0 +1,25 @@
+{
+  "endpoint": "POST /v1/approvals/{approval_id} (unknown id)",
+  "phase": "offline",
+  "request": {
+    "method": "POST",
+    "path": "/v1/approvals/appr_doesnotexist",
+    "auth": true,
+    "body": {
+      "decision": "allow",
+      "remember": false
+    }
+  },
+  "status": 404,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "error": {
+        "message": "no pending approval with id 'appr_doesnotexist'",
+        "status": 404
+      }
+    }
+  },
+  "elapsed_ms": 1,
+  "recorded_at": "2026-10-13T21:29:08+00:00"
+}

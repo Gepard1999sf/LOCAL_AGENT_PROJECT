@@ -1,0 +1,88 @@
+{
+  "endpoint": "GET /v1/usage",
+  "phase": "mock",
+  "request": {
+    "method": "GET",
+    "path": "/v1/usage?group_by=day",
+    "auth": true,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "since": null,
+      "until": null,
+      "group_by": "day",
+      "totals": {
+        "input_tokens": 8400,
+        "output_tokens": 294,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0,
+        "reasoning_replay_tokens": 0,
+        "cache_write_tokens": 0,
+        "cost_usd": 0.0,
+        "cost_cny": 0.0,
+        "priced_turns": 0,
+        "unpriced_turns": 1,
+        "cny_priced_turns": 0,
+        "cny_unpriced_turns": 1,
+        "cny_unpriced_reasons": [
+          "unknown_provider_route"
+        ],
+        "nonmetered_turns": 6,
+        "cost_complete": false,
+        "unpriced_reasons": [
+          "unknown_provider_route"
+        ],
+        "unpriced_classes": [],
+        "pricing_provenances": [],
+        "live_pricing_defects": [],
+        "live_pricing_unusable_defects": [],
+        "route_receipts": [
+          "provider=ollama identity=ollama model=qwen3:0.6b surface=local-no-bill endpoint_fp=89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee billing_mode=local currency=unpriced",
+          "provider=ollama identity=ollama model=qwen3:4b surface=local-no-bill endpoint_fp=89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee billing_mode=local currency=unpriced"
+        ],
+        "dropped_usage_records": 0,
+        "turns": 7
+      },
+      "buckets": [
+        {
+          "key": "2026-10-13",
+          "input_tokens": 8400,
+          "output_tokens": 294,
+          "cached_tokens": 0,
+          "reasoning_tokens": 0,
+          "reasoning_replay_tokens": 0,
+          "cache_write_tokens": 0,
+          "cost_usd": 0.0,
+          "cost_cny": 0.0,
+          "priced_turns": 0,
+          "unpriced_turns": 1,
+          "cny_priced_turns": 0,
+          "cny_unpriced_turns": 1,
+          "cny_unpriced_reasons": [
+            "unknown_provider_route"
+          ],
+          "nonmetered_turns": 6,
+          "cost_complete": false,
+          "unpriced_reasons": [
+            "unknown_provider_route"
+          ],
+          "unpriced_classes": [],
+          "pricing_provenances": [],
+          "live_pricing_defects": [],
+          "live_pricing_unusable_defects": [],
+          "route_receipts": [
+            "provider=ollama identity=ollama model=qwen3:0.6b surface=local-no-bill endpoint_fp=89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee billing_mode=local currency=unpriced",
+            "provider=ollama identity=ollama model=qwen3:4b surface=local-no-bill endpoint_fp=89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee billing_mode=local currency=unpriced"
+          ],
+          "dropped_usage_records": 0,
+          "turns": 7
+        }
+      ]
+    }
+  },
+  "elapsed_ms": 4,
+  "recorded_at": "2026-10-13T21:30:24+00:00"
+}

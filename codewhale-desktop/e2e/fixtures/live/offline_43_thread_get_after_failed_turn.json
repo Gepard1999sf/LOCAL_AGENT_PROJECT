@@ -1,0 +1,444 @@
+{
+  "endpoint": "GET /v1/threads/{id}",
+  "phase": "offline",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_66897057f8ab4643be149a7d962d9407",
+    "auth": true,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "thread": {
+        "schema_version": 2,
+        "id": "thr_66897057f8ab4643be149a7d962d9407",
+        "created_at": "2026-10-13T21:28:37.459933603Z",
+        "updated_at": "2026-10-13T21:29:06.882443279Z",
+        "model": "qwen3:0.6b",
+        "model_provider": "ollama",
+        "model_provider_id": "ollama",
+        "workspace": "/work/demo-project",
+        "mode": "agent",
+        "permission_posture": "ask",
+        "allow_shell": true,
+        "trust_mode": false,
+        "auto_approve": false,
+        "latest_turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+        "archived": false,
+        "title": "Тестовая сессия"
+      },
+      "turns": [
+        {
+          "schema_version": 2,
+          "id": "turn_7b44934ae7ff416e91488a09d4a15705",
+          "thread_id": "thr_66897057f8ab4643be149a7d962d9407",
+          "status": "completed",
+          "input_summary": "Manual context compaction",
+          "created_at": "2026-10-13T21:28:38.003384103Z",
+          "started_at": "2026-10-13T21:28:38.003384103Z",
+          "ended_at": "2026-10-13T21:28:38.056089488Z",
+          "duration_ms": 52,
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          },
+          "routing_settlement": false,
+          "effective_route_usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          },
+          "permission_posture": "ask",
+          "mode": "agent",
+          "effective_provider": "ollama",
+          "effective_provider_id": "ollama",
+          "effective_model": "qwen3:0.6b",
+          "item_ids": [
+            "item_0c97589bbcd74c108902f9b400e4fb77"
+          ],
+          "steer_count": 0,
+          "workspace": {
+            "state": "unavailable",
+            "reason": "not_captured",
+            "truncated": false,
+            "omitted": 0
+          }
+        },
+        {
+          "schema_version": 2,
+          "id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "thread_id": "thr_66897057f8ab4643be149a7d962d9407",
+          "status": "failed",
+          "input_summary": "Привет! Ответь одним словом.",
+          "created_at": "2026-10-13T21:28:38.416434123Z",
+          "started_at": "2026-10-13T21:28:38.444519999Z",
+          "ended_at": "2026-10-13T21:29:06.874920458Z",
+          "duration_ms": 28430,
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          },
+          "routing_settlement": false,
+          "effective_route_usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          },
+          "permission_posture": "ask",
+          "mode": "agent",
+          "effective_provider": "ollama",
+          "effective_provider_id": "ollama",
+          "effective_billing_surface": "local-no-bill",
+          "effective_endpoint_fingerprint": "89caf70a6a58a082c8bd16cc0a4ad72d0a2ab0a8d0f495421057ebb5ce6460ee",
+          "effective_billing_mode": "local",
+          "effective_dispatched_at": "2026-10-13T21:28:38.690210325Z",
+          "effective_model": "qwen3:0.6b",
+          "modelRequestDiagnostics": {
+            "modelRequestsStarted": 4,
+            "transportRetries": 12,
+            "transparentStreamRetries": 0,
+            "streamResumes": 3,
+            "reasoningOnlyReprompts": 0,
+            "emptyStopRetries": 0
+          },
+          "error": "Network error: Cannot reach localhost:11434 or the configured proxy (connection refused): error sending request for url (http://localhost:11434/v1/chat/completions): client error (Connect): tcp connect error: Connection refused (os error 111)",
+          "item_ids": [
+            "item_013992c8119847caaa38560d6777dda0",
+            "item_d4106cfb05b24911bae3023bb39ee5a7",
+            "item_ec5874e22f4445f5a1dd6fd9481efc12",
+            "item_68df70996abe46f5a001d0712e3c698d",
+            "item_902d33223374417db0f149902666e467",
+            "item_23ce636c2a564ad29d9e297e4f9a51d0",
+            "item_8df9d3d57dc04c0ea5ab53fcf64631b2",
+            "item_e41632b48ce741f6950af3941fcfb592",
+            "item_1a5c17a9ca714a52a25e7a4710b2a408",
+            "item_f54a3243df8244a98834e38e5052e8b0",
+            "item_a53c77822f914ac09b0b980bf7756ec4",
+            "item_b0131bba146d4c0dad5afd1be2ceb26c",
+            "item_f3f3794ccc7146b79a2e889bb7c723b6",
+            "item_0e383075db0046bcb467096fc1af4d97",
+            "item_480d7a801cf24e5c95a3d8b091dff7be",
+            "item_a2025012b9ce46a7b82913d095c1504d",
+            "item_b23559eb1b5842fc943766d694c898b9",
+            "item_7d2c85da298b4760a2f00eb02176f769",
+            "item_30d1900cc4854e3da8f974fb73b7d288",
+            "item_3c2bf8b5fb934656a335f86347f829c3",
+            "item_d7511f471816488ba19ebeeb0490e4df",
+            "item_23abfb34efdc443ba9d9a52251d5e24d"
+          ],
+          "steer_count": 0,
+          "workspace": {
+            "state": "settled",
+            "pre_turn_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+            "post_turn_snapshot_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+            "truncated": false,
+            "omitted": 0
+          },
+          "workspace_snapshots": [
+            {
+              "kind": "pre_turn",
+              "snapshot_id": "856f6451c8a01a52b8c383fb41a5ca8117c32eee",
+              "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+              "session_id": "thr_66897057f8ab4643be149a7d962d9407"
+            },
+            {
+              "kind": "post_turn",
+              "snapshot_id": "7985cd2902c98b699f48b4e78889fcf4d04e83c7",
+              "tree_id": "7991729c13a3d840394f3ba19d89f5e887bbd469",
+              "session_id": "thr_66897057f8ab4643be149a7d962d9407",
+              "changed_paths": []
+            }
+          ]
+        }
+      ],
+      "items": [
+        {
+          "schema_version": 2,
+          "id": "item_0c97589bbcd74c108902f9b400e4fb77",
+          "turn_id": "turn_7b44934ae7ff416e91488a09d4a15705",
+          "kind": "context_compaction",
+          "status": "completed",
+          "summary": "Made room: 0 → 1 messages (0 removed), ~3000 → ~3119 tokens (summary; last round kept: 0 messages (0 tool results))",
+          "detail": "Made room: 0 → 1 messages (0 removed), ~3000 → ~3119 tokens (summary; last round kept: 0 messages (0 tool results))",
+          "metadata": {
+            "compaction_id": "compact_7f91fc8b9c7047c3851e4bc47c3fe0c4"
+          },
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:38.016600171Z",
+          "ended_at": "2026-10-13T21:28:38.032661880Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_013992c8119847caaa38560d6777dda0",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "user_message",
+          "status": "completed",
+          "summary": "Привет! Ответь одним словом.",
+          "detail": "Привет! Ответь одним словом.",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:38.416434123Z",
+          "ended_at": "2026-10-13T21:28:38.416434123Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_d4106cfb05b24911bae3023bb39ee5a7",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 1/3; network error; waiting 0.91s",
+          "detail": "Retry attempt: transport 1/3; network error; waiting 0.91s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:38.720589920Z",
+          "ended_at": "2026-10-13T21:28:38.720591840Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_ec5874e22f4445f5a1dd6fd9481efc12",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 2/3; network error; waiting 1.96s",
+          "detail": "Retry attempt: transport 2/3; network error; waiting 1.96s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:39.604914237Z",
+          "ended_at": "2026-10-13T21:28:39.604918005Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_68df70996abe46f5a001d0712e3c698d",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 3/3; network error; waiting 4.25s",
+          "detail": "Retry attempt: transport 3/3; network error; waiting 4.25s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:41.565679869Z",
+          "ended_at": "2026-10-13T21:28:41.565684081Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_902d33223374417db0f149902666e467",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry exhaustion: transport request stopped after 3 retries; network error",
+          "detail": "Retry exhaustion: transport request stopped after 3 retries; network error",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:45.821039046Z",
+          "ended_at": "2026-10-13T21:28:45.821042726Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_23ce636c2a564ad29d9e297e4f9a51d0",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: stream-open 1/3; connection failed before response headers",
+          "detail": "Retry attempt: stream-open 1/3; connection failed before response headers",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:45.847350688Z",
+          "ended_at": "2026-10-13T21:28:45.847352746Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_8df9d3d57dc04c0ea5ab53fcf64631b2",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 1/3; network error; waiting 1.05s",
+          "detail": "Retry attempt: transport 1/3; network error; waiting 1.05s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:45.899754494Z",
+          "ended_at": "2026-10-13T21:28:45.899756294Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_e41632b48ce741f6950af3941fcfb592",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 2/3; network error; waiting 2.13s",
+          "detail": "Retry attempt: transport 2/3; network error; waiting 2.13s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:46.882512799Z",
+          "ended_at": "2026-10-13T21:28:46.882517030Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_1a5c17a9ca714a52a25e7a4710b2a408",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 3/3; network error; waiting 3.61s",
+          "detail": "Retry attempt: transport 3/3; network error; waiting 3.61s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:49.028699614Z",
+          "ended_at": "2026-10-13T21:28:49.028704649Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_f54a3243df8244a98834e38e5052e8b0",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry exhaustion: transport request stopped after 3 retries; network error",
+          "detail": "Retry exhaustion: transport request stopped after 3 retries; network error",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:52.647432346Z",
+          "ended_at": "2026-10-13T21:28:52.647437056Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_a53c77822f914ac09b0b980bf7756ec4",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: stream-open 2/3; connection failed before response headers",
+          "detail": "Retry attempt: stream-open 2/3; connection failed before response headers",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:52.679593101Z",
+          "ended_at": "2026-10-13T21:28:52.679594832Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_b0131bba146d4c0dad5afd1be2ceb26c",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 1/3; network error; waiting 1.01s",
+          "detail": "Retry attempt: transport 1/3; network error; waiting 1.01s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:52.734468661Z",
+          "ended_at": "2026-10-13T21:28:52.734470547Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_f3f3794ccc7146b79a2e889bb7c723b6",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 2/3; network error; waiting 2.15s",
+          "detail": "Retry attempt: transport 2/3; network error; waiting 2.15s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:53.679818212Z",
+          "ended_at": "2026-10-13T21:28:53.679822332Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_0e383075db0046bcb467096fc1af4d97",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 3/3; network error; waiting 3.90s",
+          "detail": "Retry attempt: transport 3/3; network error; waiting 3.90s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:55.833041222Z",
+          "ended_at": "2026-10-13T21:28:55.833045419Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_480d7a801cf24e5c95a3d8b091dff7be",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry exhaustion: transport request stopped after 3 retries; network error",
+          "detail": "Retry exhaustion: transport request stopped after 3 retries; network error",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:59.733634444Z",
+          "ended_at": "2026-10-13T21:28:59.733638482Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_a2025012b9ce46a7b82913d095c1504d",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: stream-open 3/3; connection failed before response headers",
+          "detail": "Retry attempt: stream-open 3/3; connection failed before response headers",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:59.771369400Z",
+          "ended_at": "2026-10-13T21:28:59.771371250Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_b23559eb1b5842fc943766d694c898b9",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 1/3; network error; waiting 1.03s",
+          "detail": "Retry attempt: transport 1/3; network error; waiting 1.03s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:28:59.824274540Z",
+          "ended_at": "2026-10-13T21:28:59.824276405Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_7d2c85da298b4760a2f00eb02176f769",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 2/3; network error; waiting 1.82s",
+          "detail": "Retry attempt: transport 2/3; network error; waiting 1.82s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:00.768302502Z",
+          "ended_at": "2026-10-13T21:29:00.768307600Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_30d1900cc4854e3da8f974fb73b7d288",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry attempt: transport 3/3; network error; waiting 4.13s",
+          "detail": "Retry attempt: transport 3/3; network error; waiting 4.13s",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:02.586964973Z",
+          "ended_at": "2026-10-13T21:29:02.586969599Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_3c2bf8b5fb934656a335f86347f829c3",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry exhaustion: transport request stopped after 3 retries; network error",
+          "detail": "Retry exhaustion: transport request stopped after 3 retries; network error",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:06.725609981Z",
+          "ended_at": "2026-10-13T21:29:06.725615044Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_d7511f471816488ba19ebeeb0490e4df",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "status",
+          "status": "completed",
+          "summary": "Retry exhaustion: stream-open stopped after 3 retries; connection failed before response headers",
+          "detail": "Retry exhaustion: stream-open stopped after 3 retries; connection failed before response headers",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:06.743334410Z",
+          "ended_at": "2026-10-13T21:29:06.743336060Z"
+        },
+        {
+          "schema_version": 2,
+          "id": "item_23abfb34efdc443ba9d9a52251d5e24d",
+          "turn_id": "turn_ae181c05393b4490b03a7ea19196154f",
+          "kind": "error",
+          "status": "failed",
+          "summary": "Network error: Cannot reach localhost:11434 or the configured proxy (connection refused): error sending request for url (http://localhost:11434/v1/chat/completions): client error (Connect): tcp connect error: Connection refused (os error 111)",
+          "detail": "Network error: Cannot reach localhost:11434 or the configured proxy (connection refused): error sending request for url (http://localhost:11434/v1/chat/completions): client error (Connect): tcp connect error: Connection refused (os error 111)",
+          "artifact_refs": [],
+          "started_at": "2026-10-13T21:29:06.791444977Z",
+          "ended_at": "2026-10-13T21:29:06.791446661Z"
+        }
+      ],
+      "latest_seq": 45,
+      "pending_approvals": [],
+      "pending_user_inputs": [],
+      "pending_dynamic_tool_calls": [],
+      "approval_grants": []
+    }
+  },
+  "elapsed_ms": 4,
+  "recorded_at": "2026-10-13T21:29:08+00:00"
+}

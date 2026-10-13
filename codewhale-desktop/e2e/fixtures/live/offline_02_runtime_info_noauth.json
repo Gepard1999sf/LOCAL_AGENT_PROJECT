@@ -1,0 +1,76 @@
+{
+  "endpoint": "GET /v1/runtime/info (no auth)",
+  "phase": "offline",
+  "request": {
+    "method": "GET",
+    "path": "/v1/runtime/info",
+    "auth": false,
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "service": "codewhale-runtime-api",
+      "runtime_api_version": "1.0",
+      "codewhale_version": "0.10.2",
+      "codewhale_commit": "unknown",
+      "bind_host": "127.0.0.1",
+      "port": 18765,
+      "auth_required": true,
+      "transports": [
+        "http",
+        "sse"
+      ],
+      "capabilities": {
+        "client_token_intents": true,
+        "account_session": true,
+        "account_model_owner": true,
+        "threads": true,
+        "thread_shell_consent": true,
+        "turns": true,
+        "turn_operation_idempotency": true,
+        "turn_operation_lookup": true,
+        "automation_mutation_preconditions": true,
+        "turn_image_inputs": true,
+        "turn_output_token_limit": true,
+        "profile_constitution": true,
+        "turn_steer": true,
+        "turn_interrupt": true,
+        "event_replay": true,
+        "external_tools": true,
+        "environments": false,
+        "worker_runtime": true,
+        "fleet_run_create": true,
+        "fleet_run_start": true,
+        "fleet_event_replay": true,
+        "fleet_event_stream": true,
+        "fleet_local_target": true,
+        "thread_goals": true,
+        "memory": true,
+        "mcp_server_management": true,
+        "skill_lifecycle": true,
+        "skill_detail": true,
+        "plugin_management": true,
+        "agent_mail": true,
+        "terminal_stream": true,
+        "terminal_input": true,
+        "terminal_resize": true,
+        "terminal_kill": true,
+        "event_stream_resume": true
+      },
+      "account": {
+        "schema_version": 1,
+        "state": "signed_out",
+        "api_base": "https://api.codewhale.net",
+        "scopes": []
+      },
+      "experimental": {
+        "environments": false
+      },
+      "version": "0.10.2"
+    }
+  },
+  "elapsed_ms": 1,
+  "recorded_at": "2026-10-13T21:28:37+00:00"
+}

@@ -1,0 +1,24 @@
+{
+  "endpoint": "GET /v1/threads/{id}/events",
+  "phase": "offline",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_66897057f8ab4643be149a7d962d9407/events?replay_limit=4096&progress=true&since_seq=0",
+    "auth": false
+  },
+  "status": 401,
+  "response_headers": {
+    "content-type": "application/json"
+  },
+  "events": [],
+  "event_names": [],
+  "recorded_at": "2026-10-13T21:29:12+00:00",
+  "response": {
+    "body": {
+      "error": {
+        "message": "runtime API bearer token required",
+        "status": 401
+      }
+    }
+  }
+}

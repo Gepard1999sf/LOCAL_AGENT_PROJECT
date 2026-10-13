@@ -1,0 +1,41 @@
+{
+  "endpoint": "PATCH /v1/threads/{id} (archived)",
+  "phase": "offline",
+  "request": {
+    "method": "PATCH",
+    "path": "/v1/threads/thr_f28c75a3585d4a39a5e8128d1e5987c8",
+    "auth": true,
+    "body": {
+      "archived": true
+    }
+  },
+  "status": 200,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "schema_version": 2,
+      "id": "thr_f28c75a3585d4a39a5e8128d1e5987c8",
+      "created_at": "2026-10-13T21:28:37.485352659Z",
+      "updated_at": "2026-10-13T21:28:38.030340172Z",
+      "model": "qwen3:4b",
+      "model_provider": "ollama",
+      "model_provider_id": "ollama",
+      "allowed_tools": [
+        "read",
+        "write",
+        "edit",
+        "bash",
+        "todo_write"
+      ],
+      "workspace": "/work/demo-project",
+      "mode": "agent",
+      "permission_posture": "ask",
+      "allow_shell": true,
+      "trust_mode": false,
+      "auto_approve": false,
+      "archived": true
+    }
+  },
+  "elapsed_ms": 21,
+  "recorded_at": "2026-10-13T21:28:38+00:00"
+}

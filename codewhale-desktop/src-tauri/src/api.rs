@@ -51,13 +51,7 @@ pub async fn cw_request(
         return Err(format!("Запрещённый путь API: {path}"));
     }
     let rt = app.state::<Runtime>();
-    let (base, token) = match rt.endpoint().await {
-        Some(e) => e,
-        None => {
-            rt.ensure_started(&app).await?;
-            rt.endpoint().await.ok_or("CodeWhale не запущен")?
-        }
-    };
+    let (base, token) = rt.api_endpoint(&app).await?;
     let method = reqwest::Method::from_bytes(method.to_uppercase().as_bytes())
         .map_err(|_| format!("Неверный метод {method}"))?;
     let mut req = rt
@@ -90,7 +84,9 @@ pub async fn cw_subscribe(app: AppHandle, thread_id: String, since_seq: Option<u
         return Err("Неверный id треда".into());
     }
     let subs = app.state::<Subscriptions>();
-    if let Some(old) = subs.tasks.lock().unwrap().remove(&thread_id) {
+    // One lock scope for abort + spawn + insert: concurrent subscribes cannot leak a stream.
+    let mut tasks = subs.tasks.lock().unwrap();
+    if let Some(old) = tasks.remove(&thread_id) {
         old.abort();
     }
     let app2 = app.clone();
@@ -98,7 +94,7 @@ pub async fn cw_subscribe(app: AppHandle, thread_id: String, since_seq: Option<u
     let handle = tauri::async_runtime::spawn(async move {
         stream_loop(app2, tid, since_seq).await;
     });
-    subs.tasks.lock().unwrap().insert(thread_id, handle);
+    tasks.insert(thread_id, handle);
     Ok(())
 }
 
@@ -121,7 +117,7 @@ async fn stream_loop(app: AppHandle, thread_id: String, since_seq: Option<u64>) 
     let mut backoff = Duration::from_millis(500);
     loop {
         let rt = app.state::<Runtime>();
-        let Some((base, token)) = rt.endpoint().await else {
+        let Some((base, token)) = rt.endpoint(&app).await else {
             emit_state(&app, &thread_id, "reconnecting", Some("CodeWhale не запущен".into()));
             tokio::time::sleep(Duration::from_secs(2)).await;
             continue;
@@ -156,33 +152,26 @@ async fn stream_loop(app: AppHandle, thread_id: String, since_seq: Option<u64>) 
         backoff = Duration::from_millis(500);
 
         let mut stream = resp.bytes_stream();
-        let mut buf: Vec<u8> = Vec::with_capacity(64 * 1024);
+        let mut parser = SseParser::default();
+        let mut frames = Vec::new();
         'read: while let Some(chunk) = stream.next().await {
             let Ok(chunk) = chunk else { break 'read };
-            buf.extend_from_slice(&chunk);
-            // Frames are separated by a blank line. Handle both \n\n and \r\n\r\n.
-            loop {
-                let pos = find_frame_end(&buf);
-                let Some((end, sep_len)) = pos else { break };
-                let frame = String::from_utf8_lossy(&buf[..end]).to_string();
-                buf.drain(..end + sep_len);
-                if let Some(ev) = parse_frame(&frame) {
-                    if let Some(s) = ev.0 {
-                        last_seq = Some(s);
-                    }
-                    let name = ev.1;
-                    // Tool snapshots are ~36 KB of schema per step; the UI does not need them.
-                    if name == "model.tools.snapshot" {
-                        continue;
-                    }
-                    let end_of_stream = name == "stream.end";
-                    let _ = app.emit(
-                        "cw-event",
-                        CwEvent { thread_id: thread_id.clone(), seq: ev.0, event: name, data: ev.2 },
-                    );
-                    if end_of_stream {
-                        break 'read;
-                    }
+            parser.feed(&chunk, &mut frames);
+            for frame in frames.drain(..) {
+                if let Some(s) = frame.id {
+                    last_seq = Some(s);
+                }
+                // Tool snapshots are ~36 KB of schema per step; the UI does not need them.
+                if frame.event == "model.tools.snapshot" {
+                    continue;
+                }
+                let end_of_stream = frame.event == "stream.end";
+                let _ = app.emit(
+                    "cw-event",
+                    CwEvent { thread_id: thread_id.clone(), seq: frame.id, event: frame.event, data: frame.data },
+                );
+                if end_of_stream {
+                    break 'read;
                 }
             }
         }
@@ -191,43 +180,131 @@ async fn stream_loop(app: AppHandle, thread_id: String, since_seq: Option<u64>) 
     }
 }
 
-fn find_frame_end(buf: &[u8]) -> Option<(usize, usize)> {
-    let mut i = 0;
-    while i + 1 < buf.len() {
-        if buf[i] == b'\n' && buf[i + 1] == b'\n' {
-            return Some((i, 2));
-        }
-        if i + 3 < buf.len() && &buf[i..i + 4] == b"\r\n\r\n" {
-            return Some((i, 4));
-        }
-        i += 1;
-    }
-    None
+struct SseFrame {
+    id: Option<u64>,
+    event: String,
+    data: String,
 }
 
-/// Returns (seq, event name, data) for a frame with data; None for comments/keepalives.
-fn parse_frame(frame: &str) -> Option<(Option<u64>, String, String)> {
-    let mut event = String::from("message");
-    let mut data = String::new();
-    let mut id: Option<u64> = None;
-    for line in frame.lines() {
-        let line = line.trim_end_matches('\r');
-        if line.starts_with(':') {
-            continue;
-        }
-        if let Some(v) = line.strip_prefix("event:") {
-            event = v.trim().to_string();
-        } else if let Some(v) = line.strip_prefix("data:") {
-            if !data.is_empty() {
-                data.push('\n');
+/// Incremental `text/event-stream` parser following the WHATWG rules: lines end
+/// with CRLF, LF or a lone CR, a blank line dispatches the event, and multi-line
+/// `data` is joined with '\n'. Every byte is scanned once, however the stream is chunked.
+#[derive(Default)]
+struct SseParser {
+    /// Unconsumed bytes: the start of a line whose terminator has not arrived yet.
+    buf: Vec<u8>,
+    /// Bytes of `buf` already known to hold no line terminator.
+    scanned: usize,
+    /// The last chunk ended with CR, so a leading LF in the next one belongs to it.
+    after_cr: bool,
+    event: String,
+    data: String,
+    has_data: bool,
+    id: Option<u64>,
+}
+
+impl SseParser {
+    fn feed(&mut self, chunk: &[u8], out: &mut Vec<SseFrame>) {
+        let mut chunk = chunk;
+        if self.after_cr && !chunk.is_empty() {
+            self.after_cr = false;
+            if chunk[0] == b'\n' {
+                chunk = &chunk[1..];
             }
-            data.push_str(v.strip_prefix(' ').unwrap_or(v));
-        } else if let Some(v) = line.strip_prefix("id:") {
-            id = v.trim().parse().ok();
+        }
+        self.buf.extend_from_slice(chunk);
+        let mut line_start = 0;
+        let mut i = self.scanned;
+        while let Some(off) = self.buf[i..].iter().position(|&b| b == b'\n' || b == b'\r') {
+            let at = i + off;
+            let mut next = at + 1;
+            if self.buf[at] == b'\r' {
+                match self.buf.get(next) {
+                    Some(b'\n') => next += 1,
+                    Some(_) => {}
+                    // The LF of a CRLF split across chunks is skipped by the next feed.
+                    None => self.after_cr = true,
+                }
+            }
+            let line = String::from_utf8_lossy(&self.buf[line_start..at]).into_owned();
+            self.line(&line, out);
+            line_start = next;
+            i = next;
+        }
+        self.buf.drain(..line_start);
+        self.scanned = self.buf.len();
+    }
+
+    fn line(&mut self, line: &str, out: &mut Vec<SseFrame>) {
+        if line.is_empty() {
+            let event = std::mem::take(&mut self.event);
+            let data = std::mem::take(&mut self.data);
+            let id = self.id.take();
+            // Empty payloads (keepalives) are dropped: the UI parses every event as JSON.
+            if std::mem::take(&mut self.has_data) && !data.is_empty() {
+                let event = if event.is_empty() { "message".to_string() } else { event };
+                out.push(SseFrame { id, event, data });
+            }
+            return;
+        }
+        if line.starts_with(':') {
+            return;
+        }
+        let (field, value) = match line.split_once(':') {
+            Some((f, v)) => (f, v.strip_prefix(' ').unwrap_or(v)),
+            None => (line, ""),
+        };
+        match field {
+            "event" => self.event = value.to_string(),
+            "data" => {
+                if self.has_data {
+                    self.data.push('\n');
+                }
+                self.data.push_str(value);
+                self.has_data = true;
+            }
+            "id" => self.id = value.trim().parse().ok(),
+            _ => {}
         }
     }
-    if data.is_empty() {
-        return None;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_chunks(chunks: &[&[u8]]) -> Vec<(Option<u64>, String, String)> {
+        let mut parser = SseParser::default();
+        let mut out = Vec::new();
+        for c in chunks {
+            parser.feed(c, &mut out);
+        }
+        out.into_iter().map(|f| (f.id, f.event, f.data)).collect()
     }
-    Some((id, event, data))
+
+    #[test]
+    fn line_endings_and_multiline_data() {
+        let expected = vec![
+            (Some(1), "a".to_string(), "x\ny".to_string()),
+            (None, "message".to_string(), "z".to_string()),
+        ];
+        for sep in ["\n", "\r\n", "\r"] {
+            let text = format!("id: 1{sep}event: a{sep}data: x{sep}data:y{sep}{sep}: ping{sep}{sep}data: z{sep}{sep}");
+            assert_eq!(parse_chunks(&[text.as_bytes()]), expected, "separator {sep:?}");
+            // Byte-by-byte feeding exercises terminators split across chunks.
+            let bytes: Vec<&[u8]> = text.as_bytes().chunks(1).collect();
+            assert_eq!(parse_chunks(&bytes), expected, "separator {sep:?}, split");
+        }
+    }
+
+    #[test]
+    fn crlf_split_between_chunks_is_one_terminator() {
+        let out = parse_chunks(&[b"data: a\r", b"\ndata: b\r", b"\n\r", b"\n"]);
+        assert_eq!(out, vec![(None, "message".to_string(), "a\nb".to_string())]);
+    }
+
+    #[test]
+    fn empty_data_is_dropped() {
+        assert!(parse_chunks(&[b"event: x\ndata:\n\n"]).is_empty());
+    }
 }

@@ -1,0 +1,53 @@
+{
+  "endpoint": "POST /v1/threads/{id}/compact",
+  "phase": "offline",
+  "request": {
+    "method": "POST",
+    "path": "/v1/threads/thr_66897057f8ab4643be149a7d962d9407/compact",
+    "auth": true,
+    "body": {}
+  },
+  "status": 202,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "thread": {
+        "schema_version": 2,
+        "id": "thr_66897057f8ab4643be149a7d962d9407",
+        "created_at": "2026-10-13T21:28:37.459933603Z",
+        "updated_at": "2026-10-13T21:28:38.003384103Z",
+        "model": "qwen3:0.6b",
+        "model_provider": "ollama",
+        "model_provider_id": "ollama",
+        "workspace": "/work/demo-project",
+        "mode": "agent",
+        "permission_posture": "ask",
+        "allow_shell": true,
+        "trust_mode": false,
+        "auto_approve": false,
+        "latest_turn_id": "turn_7b44934ae7ff416e91488a09d4a15705",
+        "archived": false,
+        "title": "Тестовая сессия"
+      },
+      "turn": {
+        "schema_version": 2,
+        "id": "turn_7b44934ae7ff416e91488a09d4a15705",
+        "thread_id": "thr_66897057f8ab4643be149a7d962d9407",
+        "status": "in_progress",
+        "input_summary": "Manual context compaction",
+        "created_at": "2026-10-13T21:28:38.003384103Z",
+        "started_at": "2026-10-13T21:28:38.003384103Z",
+        "routing_settlement": false,
+        "permission_posture": "ask",
+        "mode": "agent",
+        "effective_provider": "ollama",
+        "effective_provider_id": "ollama",
+        "effective_model": "qwen3:0.6b",
+        "item_ids": [],
+        "steer_count": 0
+      }
+    }
+  },
+  "elapsed_ms": 71,
+  "recorded_at": "2026-10-13T21:28:38+00:00"
+}

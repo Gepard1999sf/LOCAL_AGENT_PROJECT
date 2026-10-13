@@ -1,0 +1,22 @@
+{
+  "endpoint": "GET /v1/threads/{id} (unknown id)",
+  "phase": "offline",
+  "request": {
+    "method": "GET",
+    "path": "/v1/threads/thr_doesnotexist",
+    "auth": true,
+    "body": null
+  },
+  "status": 404,
+  "response": {
+    "content_type": "application/json",
+    "body": {
+      "error": {
+        "message": "Thread not found: thr_doesnotexist",
+        "status": 404
+      }
+    }
+  },
+  "elapsed_ms": 2,
+  "recorded_at": "2026-10-13T21:28:37+00:00"
+}
