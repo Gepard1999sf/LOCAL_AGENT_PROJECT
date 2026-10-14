@@ -68,6 +68,7 @@ function Question({ q, pick, onChange, disabled }: { q: UserInputQuestion; pick:
             </button>
           );
         })}
+        {/* Always offered, as in the TUI since v0.9.4: `allow_free_text` no longer gates it. */}
         <input
           value={pick.text}
           disabled={disabled}

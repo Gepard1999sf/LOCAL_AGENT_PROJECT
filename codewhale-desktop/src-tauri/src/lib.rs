@@ -1,4 +1,5 @@
 mod api;
+mod models;
 mod ollama;
 mod runtime;
 mod settings;
@@ -14,6 +15,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(runtime::Runtime::new())
         .manage(api::Subscriptions::default())
+        .manage(models::PullRegistry::default())
         .setup(|app| {
             let settings = settings::Settings::load(app.handle());
             app.manage(settings);
@@ -39,6 +41,14 @@ pub fn run() {
             ollama::ollama_models,
             ollama::ollama_unload,
             ollama::ollama_create_variant,
+            models::models_pull,
+            models::models_pull_cancel,
+            models::models_pulls_active,
+            models::models_delete,
+            models::models_copy,
+            models::models_show,
+            models::models_running,
+            models::models_estimate_vram,
             system::gpu_stats,
             system::git_branch,
             system::path_info,

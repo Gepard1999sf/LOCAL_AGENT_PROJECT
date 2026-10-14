@@ -7,7 +7,8 @@ import { CodeBlock } from "./CodeBlock";
 import { api } from "../../lib/tauri";
 import { resolvePath } from "../../lib/paths";
 
-const FILE_REF = /^([A-Za-z]:[\\/])?[\w.\-\\/]+\.[A-Za-z0-9]{1,8}(:\d+)?$/;
+// Unicode letters: Cyrillic user and folder names are common on Russian Windows.
+const FILE_REF = /^([A-Za-z]:[\\/])?[\p{L}\p{M}\p{N}_.\-\\/]+\.[A-Za-z0-9]{1,8}(:\d+)?$/u;
 
 function InlineCode({ children }: { children?: ReactNode }) {
   const text = String(children ?? "");
