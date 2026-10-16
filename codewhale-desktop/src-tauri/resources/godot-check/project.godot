@@ -1,0 +1,9 @@
+; Minimal project so `godot --headless --path <here> --script res://check.gd` can run.
+config_version=5
+
+[application]
+config/name="codewhale-shader-check"
+config/features=PackedStringArray("4.4")
+
+[rendering]
+renderer/rendering_method="gl_compatibility"

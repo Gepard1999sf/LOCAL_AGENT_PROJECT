@@ -41,7 +41,11 @@ fn defaults() -> Value {
             "bash": false,
             "Web": false
         },
-        "language": "ru"
+        "language": "ru",
+        // Knowledge drive (removable 1 TB disk) and the tools its MCP server drives.
+        "knowledgeDrive": { "root": null, "kiwixPort": 8090 },
+        "godotPath": null,
+        "pythonPath": null
     })
 }
 

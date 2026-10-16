@@ -99,6 +99,8 @@ export class MockBackend implements TurnHost {
   dialogOpenResult: string | string[] | null = null;
   dialogSaveResult: string | null = "C:\\Users\\dev\\Documents\\codewhale-export.md";
   readonly exports = new Map<string, string>();
+  /** Knowledge drive (src-tauri/src/drive.rs): mutated by the drive_* commands below. */
+  drive: Record<string, any> = clone(D.DRIVE_STATUS);
 
   // ---- CodeWhale runtime state ----
   readonly threads = new Map<string, MockThread>();
@@ -366,6 +368,50 @@ export class MockBackend implements TurnHost {
 
       case "gpu_stats":
         return this.gpu;
+
+      // Knowledge drive (src-tauri/src/drive.rs).
+      case "drive_status":
+        return this.drive;
+      case "drive_register_mcp":
+        this.drive.mcpRegistered = true;
+        return this.drive.mcpPath;
+      case "drive_unregister_mcp":
+        this.drive.mcpRegistered = false;
+        return this.drive.mcpPath;
+      case "drive_set_ollama_models":
+        this.drive.ollamaModelsEnv = `${this.drive.root}\\models`;
+        this.drive.ollamaModelsOnDrive = true;
+        return this.drive.ollamaModelsEnv;
+      case "drive_restart_ollama":
+        return "C:\\Users\\dev\\AppData\\Local\\Programs\\Ollama\\ollama app.exe";
+      case "drive_index_build": {
+        const summary = { path: `${this.drive.root}\\index\\git_vault.sqlite`, files: 1234, bytes: 55_000_000, skipped: 10, elapsedMs: 4200 };
+        this.drive.index = { path: summary.path, bytes: 80_000_000, files: summary.files, builtAt: "2026-10-16T10:00:00Z" };
+        return summary;
+      }
+      case "drive_kiwix_start": {
+        const books = [{ name: "gamedev.stackexchange.com_en_all", title: "Game Development Stack Exchange" }];
+        this.drive.kiwixRunning = true;
+        this.drive.kiwixOnline = true;
+        this.drive.kiwixBooks = books;
+        return { url: this.drive.kiwixUrl, running: true, books };
+      }
+      case "drive_kiwix_stop":
+        this.drive.kiwixRunning = false;
+        this.drive.kiwixOnline = false;
+        this.drive.kiwixBooks = [];
+        return true;
+      case "drive_install_skills": {
+        const base = args.toWorkspace ? `${this.settings.workspace}\\.agents\\skills` : "C:\\Users\\dev\\.codewhale\\skills";
+        this.drive.skillsInstalled = ["knowledge-drive", "math-physics-godot"];
+        return this.drive.skillsInstalled.map((n: string) => `${base}\\${n}\\SKILL.md`);
+      }
+      case "drive_install_helpers":
+        this.drive.helpersInstalled = true;
+        this.drive.sympyHelper = `${this.drive.root}\\bin\\sympy_helper.py`;
+        return [this.drive.sympyHelper, `${this.drive.root}\\bin\\init-ai-drive.ps1`];
+      case "drive_golden_models":
+        return D.GOLDEN_MODELS;
       case "git_branch":
         return this.branch;
       case "path_info": {

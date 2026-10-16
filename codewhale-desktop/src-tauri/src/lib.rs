@@ -1,4 +1,6 @@
 mod api;
+mod drive;
+pub mod drive_mcp;
 mod models;
 mod ollama;
 mod runtime;
@@ -16,6 +18,7 @@ pub fn run() {
         .manage(runtime::Runtime::new())
         .manage(api::Subscriptions::default())
         .manage(models::PullRegistry::default())
+        .manage(drive::DriveProcs::default())
         .setup(|app| {
             let settings = settings::Settings::load(app.handle());
             app.manage(settings);
@@ -49,6 +52,17 @@ pub fn run() {
             models::models_show,
             models::models_running,
             models::models_estimate_vram,
+            drive::drive_status,
+            drive::drive_register_mcp,
+            drive::drive_unregister_mcp,
+            drive::drive_set_ollama_models,
+            drive::drive_restart_ollama,
+            drive::drive_index_build,
+            drive::drive_kiwix_start,
+            drive::drive_kiwix_stop,
+            drive::drive_install_skills,
+            drive::drive_install_helpers,
+            drive::drive_golden_models,
             system::gpu_stats,
             system::git_branch,
             system::path_info,

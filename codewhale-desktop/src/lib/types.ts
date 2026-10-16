@@ -231,5 +231,11 @@ export interface AppSettings {
   showThinking: boolean;
   autoApprove: Record<string, boolean>;
   language: string;
+  /** Removable knowledge drive (docsets, git_vault, Kiwix, models) served to the agent over MCP. */
+  knowledgeDrive: { root: string | null; kiwixPort: number };
+  /** Godot 4 editor binary used by the ai-drive `godot_check` tool. */
+  godotPath: string | null;
+  /** Python used for the SymPy helper; null = `python` from PATH. */
+  pythonPath: string | null;
   _file?: string;
 }

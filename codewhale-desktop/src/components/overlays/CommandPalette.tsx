@@ -16,6 +16,7 @@ import {
   Shrink,
   Sun,
   FileText,
+  HardDrive,
 } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
@@ -115,6 +116,7 @@ export function CommandPalette() {
             )}
             <Item icon={<Settings size={14} />} label="Настройки" value="settings настройки ollama" shortcut="Ctrl+," onSelect={run(() => setOverlay("settings"))} />
             <Item icon={<Cpu size={14} />} label="Управление моделями Ollama" value="models модели ollama" onSelect={run(() => setOverlay("models"))} />
+            <Item icon={<HardDrive size={14} />} label="Диск знаний" value="drive диск знаний mcp docsets kiwix" onSelect={run(() => setOverlay("drive"))} />
             <Item
               icon={theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
               label={theme === "dark" ? "Светлая тема" : "Тёмная тема"}

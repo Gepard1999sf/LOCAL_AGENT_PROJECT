@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FolderOpen, Keyboard, RefreshCw, X, Download, Archive } from "lucide-react";
+import { FolderOpen, Keyboard, RefreshCw, X, Download, Archive, HardDrive } from "lucide-react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { open as openDialog, save } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
@@ -44,7 +44,11 @@ export function SettingsPanel() {
   const [cwPath, setCwPath] = useState(settings?.codewhalePath ?? "");
   const [checking, setChecking] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [driveRoot, setDriveRoot] = useState(settings?.knowledgeDrive?.root ?? "");
+  const [godotPath, setGodotPath] = useState(settings?.godotPath ?? "");
 
+  useEffect(() => setDriveRoot(settings?.knowledgeDrive?.root ?? ""), [settings?.knowledgeDrive?.root]);
+  useEffect(() => setGodotPath(settings?.godotPath ?? ""), [settings?.godotPath]);
   useEffect(() => setUrl(settings?.ollamaUrl ?? ""), [settings?.ollamaUrl]);
   useEffect(() => setCwPath(settings?.codewhalePath ?? ""), [settings?.codewhalePath]);
   if (!settings) return null;
@@ -256,6 +260,55 @@ export function SettingsPanel() {
         <SectionTitle>Клавиатура</SectionTitle>
         <Button variant="ghost" className="-ml-2" onClick={() => setOverlay("shortcuts")}>
           <Keyboard size={13} /> Показать все горячие клавиши →
+        </Button>
+
+        <SectionTitle>Диск знаний и Godot</SectionTitle>
+        <Field label="Папка диска знаний" hint="Съёмный диск с docsets, git_vault, kiwix_zim и моделями (по умолчанию D:\\AI_Drive)">
+          <div className="flex gap-1.5">
+            <input
+              className={inputCls}
+              value={driveRoot}
+              placeholder="D:\\AI_Drive"
+              onChange={(e) => setDriveRoot(e.target.value)}
+              onBlur={() => driveRoot.trim() !== (settings.knowledgeDrive?.root ?? "") && update({ knowledgeDrive: { ...settings.knowledgeDrive, root: driveRoot.trim() || null } })}
+            />
+            <Button
+              onClick={async () => {
+                const dir = await openDialog({ directory: true, title: "Папка диска знаний" });
+                if (typeof dir === "string") {
+                  setDriveRoot(dir);
+                  update({ knowledgeDrive: { ...settings.knowledgeDrive, root: dir } });
+                }
+              }}
+            >
+              <FolderOpen size={13} />
+            </Button>
+          </div>
+        </Field>
+        <Field label="Godot 4 (godot.exe)" hint="Для проверки .gd и .gdshader без окна (инструмент godot_check)">
+          <div className="flex gap-1.5">
+            <input
+              className={inputCls}
+              value={godotPath}
+              placeholder="F:\\PROJECTS\\godot-hd\\engine\\bin\\godot.windows.editor.x86_64.exe"
+              onChange={(e) => setGodotPath(e.target.value)}
+              onBlur={() => godotPath.trim() !== (settings.godotPath ?? "") && update({ godotPath: godotPath.trim() || null })}
+            />
+            <Button
+              onClick={async () => {
+                const file = await openDialog({ title: "Исполняемый файл Godot", filters: [{ name: "Godot", extensions: ["exe"] }] });
+                if (typeof file === "string") {
+                  setGodotPath(file);
+                  update({ godotPath: file });
+                }
+              }}
+            >
+              <FolderOpen size={13} />
+            </Button>
+          </div>
+        </Field>
+        <Button variant="ghost" className="-ml-2" onClick={() => setOverlay("drive")}>
+          <HardDrive size={13} /> Открыть панель «Диск знаний» →
         </Button>
 
         <SectionTitle>Данные</SectionTitle>

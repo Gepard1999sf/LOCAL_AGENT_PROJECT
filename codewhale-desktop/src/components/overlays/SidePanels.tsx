@@ -14,7 +14,7 @@ function openLink(url: string) {
   openUrl(url).catch((e) => toast.error("Не удалось открыть ссылку", { description: String(e) }));
 }
 
-function Panel({ title, children, width = 400 }: { title: React.ReactNode; children: React.ReactNode; width?: number }) {
+export function Panel({ title, children, width = 400 }: { title: React.ReactNode; children: React.ReactNode; width?: number }) {
   const setOverlay = useApp((s) => s.setOverlay);
   return (
     <aside

@@ -12,6 +12,7 @@ import { OllamaOffline, RuntimeFailed } from "./components/screens/StatusScreens
 import { SettingsPanel } from "./components/overlays/SettingsPanel";
 import { CommandPalette } from "./components/overlays/CommandPalette";
 import { AboutPanel, LogsPanel, ModelsPanel, ShortcutsPanel, UsagePanel } from "./components/overlays/SidePanels";
+import { KnowledgeDrivePanel } from "./components/drive/KnowledgeDrivePanel";
 
 function Main() {
   const runtime = useApp((s) => s.runtime.state);
@@ -38,6 +39,8 @@ function Overlays() {
       return <ModelsPanel />;
     case "usage":
       return <UsagePanel />;
+    case "drive":
+      return <KnowledgeDrivePanel />;
     default:
       return null;
   }

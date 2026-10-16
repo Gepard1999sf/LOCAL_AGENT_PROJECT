@@ -19,8 +19,11 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# Only loopback HTTP is used (CodeWhale app-server and Ollama), so TLS is left out.
-reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "http2"] }
+# Only loopback HTTP is used (CodeWhale app-server, Ollama, kiwix-serve), so TLS is left out.
+# `blocking` serves the standalone MCP server process (drive_mcp.rs), which has no tokio runtime.
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "http2", "blocking"] }
+# Knowledge drive: Zeal/Dash docset indexes (.dsidx) and our FTS5 index over git_vault.
+rusqlite = { version = "0.40", features = ["bundled"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "process", "io-util", "net"] }
 futures-util = "0.3"
 getrandom = "0.3"
