@@ -101,6 +101,8 @@ export class MockBackend implements TurnHost {
   readonly exports = new Map<string, string>();
   /** Knowledge drive (src-tauri/src/drive.rs): mutated by the drive_* commands below. */
   drive: Record<string, any> = clone(D.DRIVE_STATUS);
+  /** ComfyUI asset factory (src-tauri/src/comfy.rs). */
+  comfy: Record<string, any> = clone(D.COMFY_STATUS);
 
   // ---- CodeWhale runtime state ----
   readonly threads = new Map<string, MockThread>();
@@ -412,6 +414,31 @@ export class MockBackend implements TurnHost {
         return [this.drive.sympyHelper, `${this.drive.root}\\bin\\init-ai-drive.ps1`];
       case "drive_golden_models":
         return D.GOLDEN_MODELS;
+
+      // ComfyUI asset factory (src-tauri/src/comfy.rs).
+      case "comfy_status":
+        return this.comfy;
+      case "comfy_start":
+        if (!this.settings.comfy?.dir) throw "Укажите папку ComfyUI (где лежит main.py) в настройках";
+        this.comfy = { ...this.comfy, online: true, version: "0.11.86", startedByApp: true, error: null, devices: [{ name: "cuda:0 NVIDIA GeForce RTX 5060", vramTotalMb: 8192, vramFreeMb: 7100 }] };
+        return this.comfy.url;
+      case "comfy_stop":
+        this.comfy = { ...this.comfy, online: false, startedByApp: false, devices: [] };
+        return true;
+      case "comfy_register_mcp":
+        this.comfy.mcpRegistered = true;
+        return this.comfy.mcpPath;
+      case "comfy_unregister_mcp":
+        this.comfy.mcpRegistered = false;
+        return this.comfy.mcpPath;
+      case "comfy_install_templates":
+        this.comfy.templates = ["ui_icon", "pbr_material", "sprite_sheet"].map((name) => ({ name, path: `${this.comfy.workflowsDir}\\${name}_api.json`, placeholders: ["SEED", "WIDTH", "HEIGHT", "POSITIVE_PROMPT"], nodeCount: 7, nodeTypes: ["KSampler"], savePrefixes: [["9", `codewhale/${name}`]], description: "", meta: {} }));
+        this.comfy.skillInstalled = true;
+        return [`${this.comfy.workflowsDir}\\ui_icon_api.json`, this.comfy.extraModelPaths];
+      case "comfy_free":
+        return "VRAM ComfyUI освобождена";
+      case "comfy_generate":
+        return { files: [], promptId: "mock" };
       case "git_branch":
         return this.branch;
       case "path_info": {

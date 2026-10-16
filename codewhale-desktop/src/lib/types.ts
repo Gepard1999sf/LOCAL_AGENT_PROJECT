@@ -215,6 +215,16 @@ export interface SavedSession {
   workspace: string;
 }
 
+export interface ComfySettings {
+  url: string;
+  dir: string | null;
+  python: string | null;
+  checkpoint: string | null;
+  unloadLlm: boolean;
+  extraArgs: string | null;
+  workflowsDir: string | null;
+}
+
 export interface AppSettings {
   ollamaUrl: string;
   codewhalePath: string | null;
@@ -237,5 +247,7 @@ export interface AppSettings {
   godotPath: string | null;
   /** Python used for the SymPy helper; null = `python` from PATH. */
   pythonPath: string | null;
+  /** ComfyUI asset factory (src-tauri/src/comfy.rs). */
+  comfy: ComfySettings;
   _file?: string;
 }

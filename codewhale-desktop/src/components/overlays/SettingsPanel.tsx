@@ -310,6 +310,9 @@ export function SettingsPanel() {
         <Button variant="ghost" className="-ml-2" onClick={() => setOverlay("drive")}>
           <HardDrive size={13} /> Открыть панель «Диск знаний» →
         </Button>
+        <Button variant="ghost" className="-ml-2" onClick={() => setOverlay("comfy")}>
+          <HardDrive size={13} /> Открыть панель «Фабрика ассетов» (ComfyUI) →
+        </Button>
 
         <SectionTitle>Данные</SectionTitle>
         <div className="flex flex-col items-start gap-1.5 pb-4">

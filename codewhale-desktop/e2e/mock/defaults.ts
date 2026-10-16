@@ -34,6 +34,7 @@ export const DEFAULT_SETTINGS = {
   knowledgeDrive: { root: null as string | null, kiwixPort: 8090 },
   godotPath: null as string | null,
   pythonPath: null as string | null,
+  comfy: { url: "http://127.0.0.1:8188", dir: null as string | null, python: null as string | null, checkpoint: null as string | null, unloadLlm: true, extraArgs: null as string | null, workflowsDir: null as string | null },
   _file: "C:\\Users\\dev\\AppData\\Roaming\\codewhale-desktop\\settings.json",
 };
 
@@ -175,3 +176,27 @@ export const GOLDEN_MODELS = [
   { name: "qwen3:30b-a3b", role: "Главный агент (MoE, эксперты в ОЗУ)", approxGb: 19.0, note: "Часть слоёв в 32 ГБ ОЗУ." },
   { name: "bge-m3", role: "Эмбеддинги для поиска по коду", approxGb: 1.2, note: "Для LanceDB." },
 ];
+
+/** `comfy_status` (src-tauri/src/comfy.rs): ComfyUI not running yet, nothing installed. */
+export const COMFY_STATUS = {
+  url: "http://127.0.0.1:8188",
+  online: false,
+  version: null as string | null,
+  devices: [] as Array<{ name: string; vramTotalMb: number; vramFreeMb: number }>,
+  queueRunning: 0,
+  queuePending: 0,
+  error: "connection refused" as string | null,
+  startedByApp: false,
+  dir: null as string | null,
+  dirValid: false,
+  python: "python",
+  checkpoint: null as string | null,
+  checkpoints: ["sdxl_base.safetensors"],
+  workflowsDir: "D:\\AI_Drive\\AI_Workflows",
+  templates: [] as Array<{ name: string; path: string; placeholders: string[]; nodeCount: number; nodeTypes: string[]; savePrefixes: Array<[string, string]>; description: string; meta: unknown }>,
+  mcpRegistered: false,
+  mcpPath: "C:\\Users\\dev\\.codewhale\\mcp.json",
+  skillInstalled: false,
+  ollamaLoaded: ["qwen3:4b"],
+  extraModelPaths: "D:\\AI_Drive\\AI_ComfyModels\\extra_model_paths.yaml",
+};

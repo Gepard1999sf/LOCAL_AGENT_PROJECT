@@ -17,7 +17,7 @@ import type {
 import { LITE_TOOLS } from "../lib/tools";
 import { markStreamReplaying, useThreads } from "./threads";
 
-export type Overlay = null | "settings" | "palette" | "shortcuts" | "about" | "logs" | "models" | "usage" | "drive";
+export type Overlay = null | "settings" | "palette" | "shortcuts" | "about" | "logs" | "models" | "usage" | "drive" | "comfy";
 export type InspectorTab = "tools" | "files" | "context";
 
 interface AppState {

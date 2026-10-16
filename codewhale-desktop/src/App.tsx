@@ -13,6 +13,7 @@ import { SettingsPanel } from "./components/overlays/SettingsPanel";
 import { CommandPalette } from "./components/overlays/CommandPalette";
 import { AboutPanel, LogsPanel, ModelsPanel, ShortcutsPanel, UsagePanel } from "./components/overlays/SidePanels";
 import { KnowledgeDrivePanel } from "./components/drive/KnowledgeDrivePanel";
+import { AssetFactoryPanel } from "./components/comfy/AssetFactoryPanel";
 
 function Main() {
   const runtime = useApp((s) => s.runtime.state);
@@ -41,6 +42,8 @@ function Overlays() {
       return <UsagePanel />;
     case "drive":
       return <KnowledgeDrivePanel />;
+    case "comfy":
+      return <AssetFactoryPanel />;
     default:
       return null;
   }
