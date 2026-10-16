@@ -25,6 +25,11 @@ on:
         # Keep in sync with CODEWHALE_DEFAULT_VERSION below.
         default: "0.10.1"
         type: string
+      publish_tag:
+        description: "Опубликовать GitHub Release под этим тегом (vX.Y.Z). Тег создаётся из выбранной ветки. Пусто — только артефакты запуска."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -69,6 +74,7 @@ jobs:
         id: meta
         env:
           INPUT_CODEWHALE_VERSION: ${{ inputs.codewhale_version }}
+          INPUT_PUBLISH_TAG: ${{ inputs.publish_tag }}
         run: |
           $ErrorActionPreference = 'Stop'
 
@@ -80,16 +86,19 @@ jobs:
             exit 1
           }
 
+          # A pushed tag publishes a Release; so does a manual run with publish_tag set (the
+          # release step creates that tag from the selected branch with GITHUB_TOKEN).
           $release = 'false'; $tag = ''; $prerelease = 'false'
-          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+          $refTag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "$($env:INPUT_PUBLISH_TAG)".Trim() }
+          if ($refTag) {
             # MSI accepts only X.Y.Z or X.Y.Z-N (numeric pre-release, N <= 65535).
-            if ($env:GITHUB_REF_NAME -notmatch '^v(\d+\.\d+\.\d+(-\d+)?)$') {
-              Write-Host "::error title=Bad tag::Tag '$($env:GITHUB_REF_NAME)' must look like v1.2.3 (or v1.2.3-1 for a pre-release)"
+            if ($refTag -notmatch '^v(\d+\.\d+\.\d+(-\d+)?)$') {
+              Write-Host "::error title=Bad tag::Tag '$refTag' must look like v1.2.3 (or v1.2.3-1 for a pre-release)"
               exit 1
             }
             $appVersion = $Matches[1]
             $release = 'true'
-            $tag = $env:GITHUB_REF_NAME
+            $tag = $refTag
             if ($appVersion.Contains('-')) { $prerelease = 'true' }
           } else {
             $conf = Get-Content -Raw -LiteralPath 'codewhale-desktop/src-tauri/tauri.conf.json' | ConvertFrom-Json
