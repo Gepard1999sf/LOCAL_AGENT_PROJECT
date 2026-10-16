@@ -338,3 +338,69 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 30
+
+      # Portable build: the release exe with the CodeWhale sidecar and the bundled resources
+      # next to it, no installer. Runs from any folder; needs only the WebView2 runtime that
+      # Windows 10/11 ship with. Settings still live in %APPDATA%\net.codewhale.desktop.
+      - name: Assemble portable build
+        id: portable
+        working-directory: codewhale-desktop/src-tauri
+        env:
+          APP_VERSION: ${{ steps.meta.outputs.app_version }}
+          CODEWHALE_VERSION: ${{ steps.meta.outputs.codewhale_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $release = Join-Path $env:CARGO_TARGET_DIR 'release'
+          $exe = Join-Path $release 'codewhale-desktop.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { Write-Host "::error::$exe not found"; exit 1 }
+
+          $dir = Join-Path $env:RUNNER_TEMP "CodeWhale-Desktop_$($env:APP_VERSION)_x64-portable"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Copy-Item -LiteralPath $exe -Destination (Join-Path $dir 'codewhale-desktop.exe')
+
+          # tauri-build copies externalBin next to the exe without the target triple; fall back
+          # to the downloaded sidecar if this Tauri version keeps it only in binaries/.
+          $sidecar = Join-Path $release 'codewhale-app-server.exe'
+          if (-not (Test-Path -LiteralPath $sidecar)) { $sidecar = "binaries/codewhale-app-server-$($env:SIDECAR_TRIPLE).exe" }
+          if (-not (Test-Path -LiteralPath $sidecar)) { Write-Host "::error::CodeWhale sidecar not found for the portable build"; exit 1 }
+          Copy-Item -LiteralPath $sidecar -Destination (Join-Path $dir 'codewhale-app-server.exe')
+
+          # Bundled resources (skills, templates, Godot check project, helper scripts) are
+          # resolved as <exe dir>\resources\... by src-tauri/src/drive.rs::resource_path.
+          Copy-Item -LiteralPath 'resources' -Destination (Join-Path $dir 'resources') -Recurse
+
+          $readme = @(
+            "CodeWhale Desktop $($env:APP_VERSION) - portable",
+            '',
+            'Запуск: codewhale-desktop.exe (ничего устанавливать не нужно).',
+            "Агент CodeWhale $($env:CODEWHALE_VERSION) лежит рядом (codewhale-app-server.exe), папку не разделять.",
+            'Нужны: Windows 10/11 с WebView2 (есть по умолчанию) и установленная Ollama (https://ollama.com/download).',
+            'Настройки и журналы: %APPDATA%\net.codewhale.desktop',
+            'SmartScreen при первом запуске: «Подробнее» -> «Выполнить в любом случае» (сборка не подписана).'
+          )
+          [System.IO.File]::WriteAllLines((Join-Path $dir 'README-portable.txt'), $readme, (New-Object System.Text.UTF8Encoding $true))
+
+          $zip = Join-Path $env:RUNNER_TEMP "CodeWhale-Desktop_$($env:APP_VERSION)_x64-portable.zip"
+          if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
+          Compress-Archive -Path (Join-Path $dir '*') -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          $size = [math]::Round((Get-Item -LiteralPath $zip).Length / 1MB, 1)
+          Write-Host "$zip  $size MB  $hash"
+          "| ``$(Split-Path $zip -Leaf)`` | $size MB | ``$hash`` |" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          "zip=$zip" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Upload portable build to the run
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.portable.outputs.zip }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach portable build to the release
+        if: steps.meta.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          ZIP: ${{ steps.portable.outputs.zip }}
+        run: gh release upload "$env:TAG" "$env:ZIP" --clobber --repo "${{ github.repository }}"
