@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Copy, Cpu, HardDriveDownload, Power, X } from "lucide-react";
+import { Copy, X } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import { useApp } from "../../store/app";
 import { api } from "../../lib/tauri";
 import { SHORTCUTS } from "../../lib/shortcuts";
-import { fmtBytes, fmtTokens } from "../../lib/format";
+import { fmtTokens } from "../../lib/format";
 import { Button, IconButton } from "../ui/primitives";
-import { effectiveCtx } from "../../lib/models";
-import { ModelBadges } from "../layout/Toolbar";
+import { ModelManager } from "../models/ModelManager";
 
 function openLink(url: string) {
   openUrl(url).catch((e) => toast.error("Не удалось открыть ссылку", { description: String(e) }));
@@ -165,134 +164,10 @@ export function UsagePanel() {
   );
 }
 
-const CTX_OPTIONS = [16384, 24576, 32768, 49152, 65536];
-
 export function ModelsPanel() {
-  const models = useApp((s) => s.models);
-  const ollama = useApp((s) => s.ollama);
-  const refreshModels = useApp((s) => s.refreshModels);
-  const refreshOllama = useApp((s) => s.refreshOllama);
-  const current = useApp((s) => s.settings?.defaultModel);
-  const setModel = useApp((s) => s.setModel);
-  const [variantFor, setVariantFor] = useState<string | null>(null);
-  const [ctx, setCtx] = useState(32768);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    refreshModels();
-    refreshOllama();
-  }, [refreshModels, refreshOllama]);
-
-  const create = async (from: string) => {
-    const base = from.replace(/:latest$/, "").replace(/[:/]/g, "-").replace(/-instruct-2507-q4_K_M$/, "");
-    const name = `${base}-${Math.round(ctx / 1024)}k`;
-    setBusy(true);
-    try {
-      await api.ollamaCreateVariant(from, name, ctx);
-      toast.success(`Создана модель ${name}`, { description: "Файлы весов общие, место на диске не тратится" });
-      setVariantFor(null);
-      await refreshModels();
-    } catch (e) {
-      toast.error("Не удалось создать вариант", { description: String(e) });
-    }
-    setBusy(false);
-  };
-
   return (
-    <Panel title="Модели Ollama" width={460}>
-      <div className="px-4 py-3 text-[12px] text-fg2">
-        Агенту нужны вызов инструментов (<span className="font-mono">🔧</span>) и контекст от 16k. Для видеокарты на 8 ГБ лучший баланс даёт{" "}
-        <span className="font-mono text-fg">qwen3-4b-32k</span>. Новые модели скачиваются командой <span className="font-mono">ollama pull имя</span>.
-      </div>
-      <div className="px-2 pb-4">
-        {models.map((m) => {
-          const loaded = ollama?.loaded?.find((l) => l.name === m.name || l.model === m.name);
-          const effCtx = effectiveCtx(m);
-          const ctxOk = (effCtx ?? 0) >= 16384;
-          const ctxOptions = CTX_OPTIONS.filter((c) => !m.nativeCtx || c <= m.nativeCtx);
-          return (
-            <div key={m.name} className={`mb-1.5 rounded-[var(--radius-md)] border px-3 py-2 ${m.name === current ? "border-blue" : "border-line"}`}>
-              <div className="flex items-center gap-2">
-                <Cpu size={14} className="text-fg3" />
-                <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{m.name}</span>
-                <ModelBadges m={m} />
-              </div>
-              <div className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-fg3">
-                <span>{m.parameterSize}</span>
-                <span>{m.quantization}</span>
-                <span>{fmtBytes(m.size)}</span>
-                <span className={ctxOk || m.embedding ? "" : "text-yellow"}>
-                  контекст {effCtx ? fmtTokens(effCtx) : "4k (по умолч.)"}
-                  {m.nativeCtx ? ` из ${fmtTokens(m.nativeCtx)}` : ""}
-                </span>
-                {loaded && (
-                  <span className={loaded.size_vram < loaded.size ? "text-yellow" : "text-green"}>
-                    в VRAM {fmtBytes(loaded.size_vram)}
-                    {loaded.size_vram < loaded.size ? " (часть на CPU)" : ""}
-                  </span>
-                )}
-              </div>
-              {!m.embedding && (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {m.name !== current && (
-                    <Button className="px-2 py-0.5 text-[12px]" onClick={() => setModel(m.name)}>
-                      Использовать
-                    </Button>
-                  )}
-                  {!ctxOk && m.capabilities.includes("tools") && ctxOptions.length > 0 && (
-                    <Button
-                      className="px-2 py-0.5 text-[12px]"
-                      onClick={() => {
-                        // Keep the selected size within what this model supports.
-                        if (!ctxOptions.includes(ctx)) setCtx(ctxOptions.includes(32768) ? 32768 : ctxOptions[ctxOptions.length - 1]);
-                        setVariantFor(variantFor === m.name ? null : m.name);
-                      }}
-                    >
-                      <HardDriveDownload size={12} /> Сделать версию с большим контекстом
-                    </Button>
-                  )}
-                  {loaded && (
-                    <Button
-                      variant="ghost"
-                      className="px-2 py-0.5 text-[12px]"
-                      onClick={async () => {
-                        try {
-                          await api.ollamaUnload(m.name);
-                          toast.success("Модель выгружена из видеопамяти");
-                        } catch (e) {
-                          toast.error("Не удалось выгрузить модель", { description: String(e) });
-                        }
-                        refreshOllama();
-                      }}
-                    >
-                      <Power size={12} /> Выгрузить из VRAM
-                    </Button>
-                  )}
-                </div>
-              )}
-              {variantFor === m.name && (
-                <div className="mt-2 flex items-center gap-2">
-                  <select
-                    className="h-7 rounded-[var(--radius-sm)] border border-line bg-base px-1.5 text-[12px]"
-                    value={ctx}
-                    onChange={(e) => setCtx(Number(e.target.value))}
-                  >
-                    {ctxOptions.map((c) => (
-                      <option key={c} value={c}>
-                        {fmtTokens(c)}
-                      </option>
-                    ))}
-                  </select>
-                  <Button variant="primary" className="px-2 py-0.5 text-[12px]" disabled={busy} onClick={() => create(m.name)}>
-                    Создать
-                  </Button>
-                  <span className="text-[11px] text-fg3">Больше контекст — больше видеопамяти.</span>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+    <Panel title="Модели Ollama" width={520}>
+      <ModelManager />
     </Panel>
   );
 }

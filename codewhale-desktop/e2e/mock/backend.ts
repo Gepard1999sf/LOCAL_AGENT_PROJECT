@@ -82,6 +82,43 @@ function waiter<T>(): Waiter<T> {
 
 const ACTIVE = new Set(["queued", "in_progress"]);
 
+// ---- Model manager helpers (mirror src-tauri/src/models.rs) ----
+
+/** Same normalization as `canonical_name`: `qwen3` == `qwen3:latest`, case-insensitive. */
+function canonical(name: string): string {
+  const n = name.trim().toLowerCase();
+  const last = n.split("/").pop() ?? n;
+  return last.includes(":") ? n : `${n}:latest`;
+}
+
+function sameModel(a: string, b: string): boolean {
+  return canonical(a) === canonical(b);
+}
+
+/** `validate_name`: rejects what the Rust command rejects, with its message. */
+function validName(v: unknown): string {
+  const name = String(v ?? "").trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(name)) throw `Недопустимое имя модели: ${name}`;
+  return name;
+}
+
+/** Id of a `Channel` the page passed as a command argument (serialized as `__CHANNEL__:<id>`). */
+function channelId(v: unknown): number | null {
+  const m = /^__CHANNEL__:(\d+)$/.exec(String(v ?? ""));
+  return m ? Number(m[1]) : null;
+}
+
+/** "8.2B" -> 8_200_000_000, "137M" -> 137_000_000. */
+function paramCount(size?: string | null): number | null {
+  const m = /^([\d.]+)([MB])$/.exec(String(size ?? ""));
+  return m ? Math.round(Number(m[1]) * (m[2] === "B" ? 1e9 : 1e6)) : null;
+}
+
+const KV_F16 = 2;
+const KV_Q8_0 = 34 / 32;
+const KV_Q4_0 = 18 / 32;
+const RUNTIME_OVERHEAD_BYTES = 512 * 1024 * 1024;
+
 export class MockBackend implements TurnHost {
   readonly fx: FixtureStore;
 
@@ -103,6 +140,17 @@ export class MockBackend implements TurnHost {
   drive: Record<string, any> = clone(D.DRIVE_STATUS);
   /** ComfyUI asset factory (src-tauri/src/comfy.rs). */
   comfy: Record<string, any> = clone(D.COMFY_STATUS);
+  /** Model manager (src-tauri/src/models.rs): downloads in flight, by canonical name. */
+  private readonly activePulls = new Map<string, { cancelled: boolean }>();
+  /** Pause between the progress frames of a mocked `models_pull`. */
+  pullStepMs = 20;
+  /**
+   * When true, a pull parks on the gate `pull:<canonical name>` right after its first byte-progress
+   * frame, so a test can look at the running state; `release()` it (or cancel the pull) to go on.
+   */
+  pullHoldsAtLayer = false;
+  /** Next message index per `Channel` id (the page delivers channel messages in index order). */
+  private readonly channelIndex = new Map<number, number>();
 
   // ---- CodeWhale runtime state ----
   readonly threads = new Map<string, MockThread>();
@@ -371,6 +419,47 @@ export class MockBackend implements TurnHost {
       case "gpu_stats":
         return this.gpu;
 
+      // Model manager (src-tauri/src/models.rs).
+      case "models_pull":
+        return this.pull(String(args.name ?? ""), channelId(args.onProgress));
+      case "models_pull_cancel": {
+        const key = canonical(String(args.name ?? ""));
+        const p = this.activePulls.get(key);
+        if (!p) return false;
+        p.cancelled = true;
+        this.release(`pull:${key}`);
+        return true;
+      }
+      case "models_pulls_active":
+        return [...this.activePulls.keys()];
+      case "models_delete": {
+        const name = validName(args.name);
+        const i = this.models.findIndex((m) => sameModel(m.name, name));
+        if (i < 0) throw `Ollama: model '${name}' not found`;
+        this.models.splice(i, 1);
+        if (Array.isArray(this.ollama.loaded)) {
+          this.ollama.loaded = this.ollama.loaded.filter((l: any) => !sameModel(l.name, name) && !sameModel(l.model, name));
+        }
+        return null;
+      }
+      case "models_copy": {
+        const from = validName(args.from);
+        const to = validName(args.to);
+        if (sameModel(from, to)) throw "Новое имя совпадает со старым";
+        const src = this.models.find((m) => sameModel(m.name, from));
+        if (!src) throw `Ollama: model '${from}' not found`;
+        if (this.models.some((m) => sameModel(m.name, to))) throw `Модель ${to} уже существует`;
+        this.models.push({ ...clone(src), name: to, modifiedAt: new Date().toISOString() });
+        return null;
+      }
+      case "models_show":
+        return this.modelDetails(validName(args.name));
+      case "models_running":
+        if (!this.ollama.online) throw `Ollama недоступна: ${this.settings.ollamaUrl}`;
+        return (this.ollama.loaded ?? []).map((l: any) => this.runningOf(l));
+      case "models_estimate_vram":
+        return this.estimateVram(validName(args.name), Number(args.numCtx));
+
       // Knowledge drive (src-tauri/src/drive.rs).
       case "drive_status":
         return this.drive;
@@ -480,6 +569,150 @@ export class MockBackend implements TurnHost {
     }
     this.unhandled.push(`invoke ${cmd}`);
     return null;
+  }
+
+  // =====================================================================
+  // Model manager (models_* commands)
+  // =====================================================================
+
+  /** Sends one message to a `Channel` the page passed in a command argument. */
+  private async channelSend(id: number, message: unknown): Promise<void> {
+    const index = this.channelIndex.get(id) ?? 0;
+    this.channelIndex.set(id, index + 1);
+    const page = this.page;
+    if (!page || page.isClosed()) return;
+    await page
+      .evaluate((m) => (window as any).__TAURI_INTERNALS__.runCallback(m.id, { index: m.index, message: m.message }), { id, index, message })
+      .catch(() => {
+        /* page navigating or closed: like a dropped webview channel */
+      });
+  }
+
+  private requireModel(name: string): Record<string, any> {
+    const m = this.models.find((x) => sameModel(x.name, name));
+    if (!m) throw `Модель ${name} не установлена`;
+    return m;
+  }
+
+  private archOf(m: Record<string, any>) {
+    const a = D.MODEL_ARCH[String(m.family ?? "")] ?? D.MODEL_ARCH.qwen3;
+    return { ...clone(a), contextLength: Number(m.nativeCtx ?? a.contextLength) };
+  }
+
+  /** `ModelDetails` (models.rs `details_from_show`) of an installed model. */
+  private modelDetails(name: string) {
+    const m = this.requireModel(name);
+    const arch = this.archOf(m);
+    const caps: string[] = m.capabilities ?? [];
+    return {
+      name: m.name,
+      family: m.family ?? null,
+      families: m.family ? [m.family] : [],
+      format: "gguf",
+      parentModel: null,
+      parameterSize: m.parameterSize ?? null,
+      parameterCount: paramCount(m.parameterSize),
+      quantizationLevel: m.quantization ?? null,
+      contextLength: arch.contextLength,
+      numCtx: m.numCtx ?? null,
+      capabilities: caps,
+      parameters: m.numCtx ? `num_ctx ${m.numCtx}` : null,
+      licenseSnippet: "Apache License\nVersion 2.0, January 2004",
+      licenseTruncated: false,
+      modifiedAt: m.modifiedAt ?? null,
+      hasProjector: caps.includes("vision"),
+      arch,
+    };
+  }
+
+  /** `RunningModel` (models.rs `running_from_ps`) from an `ollama_status` loaded entry. */
+  private runningOf(l: Record<string, any>) {
+    const m = this.models.find((x) => sameModel(x.name, l.name) || sameModel(x.name, l.model ?? l.name));
+    return {
+      name: l.name,
+      model: l.model ?? l.name,
+      size: l.size ?? 0,
+      sizeVram: l.size_vram ?? 0,
+      contextLength: l.context_length ?? null,
+      expiresAt: l.expires_at ?? null,
+      parameterSize: m?.parameterSize ?? null,
+      quantization: m?.quantization ?? null,
+      family: m?.family ?? null,
+    };
+  }
+
+  /** `VramEstimate`: the formula of models.rs `estimate_vram` (weights + KV cache + 512 MiB). */
+  private estimateVram(name: string, requested: number) {
+    if (!(requested >= 256 && requested <= 4_194_304)) throw "Контекст должен быть от 256 до 4194304 токенов";
+    const m = this.requireModel(name);
+    const a = this.archOf(m);
+    const numCtx = Math.min(requested, a.contextLength);
+    const kvHeads = a.headCountKv.length === 1 ? a.blockCount * a.headCountKv[0] : a.headCountKv.reduce((s: number, n: number) => s + n, 0);
+    const perToken = kvHeads * (a.keyLength + a.valueLength);
+    const kv = (bytesPerElement: number) => Math.ceil(perToken * numCtx * bytesPerElement);
+    const base = Number(m.size) + RUNTIME_OVERHEAD_BYTES;
+    return {
+      name: m.name,
+      numCtx,
+      nativeCtx: a.contextLength,
+      ctxClamped: numCtx !== requested,
+      weightsBytes: Number(m.size),
+      kvKnown: true,
+      kvBytesPerTokenF16: perToken * KV_F16,
+      kvF16Bytes: kv(KV_F16),
+      kvQ80Bytes: kv(KV_Q8_0),
+      kvQ40Bytes: kv(KV_Q4_0),
+      overheadBytes: RUNTIME_OVERHEAD_BYTES,
+      totalF16Bytes: base + kv(KV_F16),
+      totalQ80Bytes: base + kv(KV_Q8_0),
+      totalQ40Bytes: base + kv(KV_Q4_0),
+    };
+  }
+
+  /**
+   * `models_pull`: manifest, byte progress per layer (three frames each), verify, write, success;
+   * then the model joins `models`. Resolves `{cancelled: true}` after `models_pull_cancel`.
+   */
+  private async pull(rawName: string, channel: number | null): Promise<{ name: string; cancelled: boolean }> {
+    const name = validName(rawName);
+    const key = canonical(name);
+    if (this.activePulls.has(key)) throw `Модель ${name} уже загружается`;
+    const state = { cancelled: false };
+    this.activePulls.set(key, state);
+    let announced = 0;
+    let overallCompleted = 0;
+    const frame = (status: string, extra: Record<string, unknown> = {}, done = false) =>
+      channel == null
+        ? Promise.resolve()
+        : this.channelSend(channel, { name, status, digest: null, total: null, completed: null, overallTotal: announced, overallCompleted, done, ...extra });
+    const step = async () => {
+      await new Promise((r) => setTimeout(r, this.pullStepMs));
+      return !state.cancelled;
+    };
+    try {
+      await frame("pulling manifest");
+      if (!(await step())) return { name, cancelled: true };
+      let completedBefore = 0;
+      for (const [digest, bytes] of D.PULL_LAYERS) {
+        announced += bytes;
+        for (const part of [0, Math.floor(bytes / 2), bytes]) {
+          overallCompleted = completedBefore + part;
+          await frame(`pulling ${digest.slice(7, 19)}`, { digest, total: bytes, completed: part });
+          if (this.pullHoldsAtLayer && completedBefore === 0 && part === 0) await this.gate(`pull:${key}`);
+          if (!(await step())) return { name, cancelled: true };
+        }
+        completedBefore += bytes;
+      }
+      await frame("verifying sha256 digest");
+      await frame("writing manifest");
+      await frame("success", {}, true);
+      const installed = this.models.find((m) => sameModel(m.name, name));
+      if (installed) installed.modifiedAt = new Date().toISOString();
+      else this.models.push({ ...clone(D.PULLED_MODEL), name });
+      return { name, cancelled: false };
+    } finally {
+      if (this.activePulls.get(key) === state) this.activePulls.delete(key);
+    }
   }
 
   // =====================================================================

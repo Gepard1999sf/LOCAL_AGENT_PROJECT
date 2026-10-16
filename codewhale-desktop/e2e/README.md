@@ -60,6 +60,7 @@ npm run e2e
 | `tests/approval.spec.ts` | карточка `approval.required`; «Разрешить» / «Отклонить» / «Всегда в этой сессии» → `cw_request POST /v1/approvals/{id}`; автоподтверждение `read`; ответ 404 на закрытый запрос |
 | `tests/status-screens.spec.ts` | runtime `failed` (экран ошибки, перезапуск), падение runtime через событие, состояние `starting`, Ollama недоступна и пропадает во время работы |
 | `tests/overlays.spec.ts` | палитра команд (Ctrl+K, поиск, Esc, смена модели), панель настроек (кнопка, Ctrl+,, переключатель → `settings_set`), справка по клавишам (Ctrl+/) |
+| `tests/models.spec.ts` | менеджер моделей Ollama: вкладки, оценка VRAM (`models_estimate_vram`), «Подробнее» (`models_show`), смена модели по умолчанию, удаление и копирование (`models_delete`/`models_copy`), загрузка с прогрессом через `Channel` и отмена (`models_pull`/`models_pull_cancel`), вкладка «Запущенные» (`models_running`, `ollama_unload`) |
 | `tests/rendering.spec.ts` | подсветка кода Shiki и копирование, таблицы/списки/ссылки GFM, unified diff (номера строк, «Бок о бок»), дифф правки файла в блоке инструмента |
 
 Тест «прерванные размышления не остаются в состоянии „Думаю…“» помечен `test.fail`:
@@ -80,7 +81,8 @@ e2e/
                            askUser / fail / interrupt / complete
     events.ts              конверты cw-event и записи runtime (форма как в runtime_api.rs)
     fixtures.ts            загрузка записанных ответов: fixtures/live лучше fixtures/synthetic
-    defaults.ts            ответы Rust-команд (настройки, статус runtime, Ollama, GPU)
+    defaults.ts            ответы Rust-команд (настройки, статус runtime, Ollama, GPU, диск знаний,
+                           ComfyUI, архитектуры моделей и слои для models_*)
     test.ts                фикстуры Playwright `backend` и `app` (AppDriver)
   fixtures/
     live/                  ответы настоящего `codewhale app-server --http` (record_live.py)
@@ -135,6 +137,8 @@ test("агент правит файл после подтверждения", a
   HTTP-маршрута; `throw new HttpError(404, "…")` даёт ошибку `HTTP 404: …`, как `cw_request`.
 - `backend.calls(cmd)`, `backend.requests(method, path)`: журнал вызовов для проверок.
 - `backend.unhandled`: неизвестные команды и маршруты (попадают в аннотации теста).
+- `backend.pullStepMs`, `backend.pullHoldsAtLayer` + `backend.release("pull:<имя>")`: темп и пауза
+  сценарной загрузки `models_pull` (прогресс уходит в `Channel` страницы через `runCallback`).
 
 Если приложение не смонтировалось (например, Vite показал ошибку компиляции из-за
 недописанного файла), `app.boot()` один раз перезагружает страницу, а при повторной

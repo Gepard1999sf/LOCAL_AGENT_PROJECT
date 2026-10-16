@@ -200,3 +200,46 @@ export const COMFY_STATUS = {
   ollamaLoaded: ["qwen3:4b"],
   extraModelPaths: "D:\\AI_Drive\\AI_ComfyModels\\extra_model_paths.yaml",
 };
+
+/**
+ * Architecture numbers (`model_info`) behind `models_show` and `models_estimate_vram`
+ * (src-tauri/src/models.rs `ArchParams`), per model family of OLLAMA_MODELS.
+ */
+export const MODEL_ARCH: Record<
+  string,
+  {
+    architecture: string;
+    blockCount: number;
+    headCount: number;
+    headCountKv: number[];
+    embeddingLength: number;
+    keyLength: number;
+    valueLength: number;
+    contextLength: number;
+    slidingWindow: number | null;
+  }
+> = {
+  qwen3: { architecture: "qwen3", blockCount: 36, headCount: 32, headCountKv: [8], embeddingLength: 4096, keyLength: 128, valueLength: 128, contextLength: 40960, slidingWindow: null },
+  gemma3: { architecture: "gemma3", blockCount: 34, headCount: 8, headCountKv: [4], embeddingLength: 2560, keyLength: 256, valueLength: 256, contextLength: 131072, slidingWindow: 1024 },
+  "nomic-bert": { architecture: "nomic-bert", blockCount: 12, headCount: 12, headCountKv: [12], embeddingLength: 768, keyLength: 64, valueLength: 64, contextLength: 2048, slidingWindow: null },
+};
+
+/** What a mocked `models_pull` installs for a name that is not in OLLAMA_MODELS yet (`name` is added). */
+export const PULLED_MODEL = {
+  size: 1_400_000_000,
+  family: "qwen3",
+  parameterSize: "1.7B",
+  quantization: "Q4_K_M",
+  capabilities: ["completion", "tools", "thinking"],
+  nativeCtx: 40960,
+  numCtx: null as number | null,
+  modifiedAt: "2026-10-16T12:00:00Z",
+  embedding: false,
+};
+
+/** Layers a mocked pull announces, in order: [digest, bytes]. */
+export const PULL_LAYERS: Array<[string, number]> = [
+  ["sha256:3f4e9c0a1b2d7e8f", 1_380_000_000],
+  ["sha256:9d8c7b6a5f4e3d2c", 11_300],
+  ["sha256:1a2b3c4d5e6f7a8b", 487],
+];
