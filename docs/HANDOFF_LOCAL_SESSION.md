@@ -21,7 +21,7 @@ Windows PowerShell 5.1: без `&&`, без grep/sed; Godot 4.8 лежит в
 | MCP-сервер `comfy` (фабрика ассетов) | `src-tauri/src/comfy_mcp.rs`, `src-tauri/src/comfy.rs`, панель `src/components/comfy/` | против стенда `mock_comfy.py` с формами API ComfyUI v0.11 (`final_test_comfy.py`, 17/17) |
 | Скиллы, шаблоны, скрипты | `src-tauri/resources/` (skills/, comfy/, drive/, godot-check/) | синтаксис, юнит-тесты |
 | Демо-проект воды | `Godot/WaterDemo/` | шейдер компилируется, рендер под Xvfb |
-| Установщик/portable | `.github/workflows/release.yml` (NSIS setup, MSI, portable zip) | запуск №1 через workflow_dispatch — см. раздел 7 |
+| Установщик/portable | `.github/workflows/release.yml` (NSIS setup, MSI, portable zip) | релиз v0.1.0 опубликован, SHA-256 трёх файлов сверены — см. раздел 7 |
 | Документация | `docs/INSTALL.md`, `docs/KNOWLEDGE_DRIVE.md`, `docs/COMFYUI.md`, `docs/FINAL_TEST_WATER.md`, `PROJECT.md` | — |
 
 Исследовательские материалы агентов лежат в `docs/research/` (JSON/MD): их синтез (модель
@@ -143,22 +143,34 @@ $env:COMFY_URL='http://127.0.0.1:8188'; $env:AI_WORKFLOWS_DIR='D:\AI_Drive\AI_Wo
 
 ## 7. Установщик и portable
 
-Облачная сессия запустила `Release` (workflow_dispatch, run #1) на GitHub Actions; результат
-смотри в Actions → Release: артефакты `CodeWhale-Desktop_<ver>_x64-setup.exe`, `.msi`,
-`*-portable.zip`. Если запуск красный — логи в Actions, починить `release.yml`/код, закоммитить,
-перезапустить (Actions → Release → Run workflow на ветке). Локальная альтернатива:
+Релиз **v0.1.0** уже опубликован из облачной сессии (Actions → Release, ручной запуск с полем
+`publish_tag`; тег создан workflow'ом на коммите `1ac6ac0`):
+<https://github.com/Gepard1999sf/LOCAL_AGENT_PROJECT/releases/tag/v0.1.0>
+
+| Файл | Размер | SHA-256 |
+| --- | --- | --- |
+| `CodeWhale-Desktop_0.1.0_x64-setup.exe` (NSIS, без прав администратора) | 35,7 МБ | `cd741d85…e8e00f867` |
+| `CodeWhale-Desktop_0.1.0_x64.msi` (для всех пользователей) | 50,6 МБ | `cd471830…38bf3cfe3c` |
+| `CodeWhale-Desktop_0.1.0_x64-portable.zip` (без установки: `codewhale-desktop.exe` + `codewhale-app-server.exe` + `resources\`) | 52,1 МБ | `de5bc2bc…0ae53ea0` |
+
+Полные суммы видны на странице релиза (GitHub показывает `digest` у каждого файла) и
+проверяются так: `Get-FileHash .\CodeWhale-Desktop_0.1.0_x64-setup.exe -Algorithm SHA256`.
+
+Что осталось проверить на локальной машине (в контейнере Windows нет):
+1. `setup.exe` ставится без прав администратора, приложение запускается, SmartScreen обходится
+   через «Подробнее → Выполнить в любом случае»; WebView2 при отсутствии докачивается.
+2. Portable-zip распаковывается, `codewhale-desktop.exe` запускается (папку не разделять: агент
+   `codewhale-app-server.exe` ищется рядом); настройки и журналы — в `%APPDATA%\net.codewhale.desktop`.
+3. В обоих вариантах встроенный агент CodeWhale 0.10.1 (`codewhale-app-server.exe`) стартует (статус-точка в левом нижнем углу
+   зелёная), `Ctrl+K` → «Диск знаний» и «Фабрика ассетов» открываются.
+
+Следующий релиз: Actions → Release → **Run workflow** на нужной ветке, в поле `publish_tag`
+указать `v0.2.0` (или локально `git tag v0.2.0; git push origin v0.2.0`). Локальная сборка без
+релиза:
 ```powershell
 cd codewhale-desktop
 npm run bundle    # NSIS + MSI в <CARGO_TARGET_DIR>\release\bundle\
 ```
-Когда сборка зелёная, выпустить релиз тегом (установщики появятся в GitHub Releases без
-логина):
-```powershell
-git tag v0.1.0
-git push origin v0.1.0
-```
-Критерий: установщик ставится без прав администратора, приложение запускается; portable-zip
-распаковывается и запускается; SmartScreen обходится через «Подробнее → Выполнить в любом случае».
 
 ## 8. Прочие хвосты (после основного)
 
