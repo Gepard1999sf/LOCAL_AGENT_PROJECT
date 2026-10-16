@@ -75,6 +75,7 @@ jobs:
         env:
           INPUT_CODEWHALE_VERSION: ${{ inputs.codewhale_version }}
           INPUT_PUBLISH_TAG: ${{ inputs.publish_tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = 'Stop'
 
@@ -97,6 +98,24 @@ jobs:
               exit 1
             }
             $appVersion = $Matches[1]
+            # publish_tag on a branch: the release step creates the tag at this commit. If the tag
+            # already exists elsewhere, the installers built here would not match it; refuse.
+            # (A re-run after a failed publish is fine: the tag then points at this same commit.)
+            if ($env:GITHUB_REF_TYPE -ne 'tag') {
+              $existing = gh api "repos/$($env:GITHUB_REPOSITORY)/git/ref/tags/$refTag" --jq '.object.sha + " " + .object.type' 2>$null
+              if ($LASTEXITCODE -eq 0 -and $existing) {
+                $sha, $type = $existing.Trim() -split ' '
+                if ($type -eq 'tag') {
+                  # Annotated tag: resolve the tag object to the commit it points at.
+                  $sha = gh api "repos/$($env:GITHUB_REPOSITORY)/git/tags/$sha" --jq '.object.sha'
+                }
+                if ($sha -ne $env:GITHUB_SHA) {
+                  Write-Host "::error title=Tag exists::$refTag already points at $sha, not at this commit ($($env:GITHUB_SHA)). Delete the tag or pick another version."
+                  exit 1
+                }
+                Write-Host "Tag $refTag already exists at this commit; the release will be attached to it."
+              }
+            }
             $release = 'true'
             $tag = $refTag
             if ($appVersion.Contains('-')) { $prerelease = 'true' }
@@ -235,7 +254,8 @@ jobs:
           # the 128 MB sidecar. Recreate the overlay here if the checkout does not have it.
           $bundleConf = 'src-tauri/tauri.bundle.conf.json'
           if (Test-Path -LiteralPath $bundleConf) {
-            $bins = @((Get-Content -Raw -LiteralPath $bundleConf | ConvertFrom-Json).bundle.externalBin)
+            $overlay = Get-Content -Raw -LiteralPath $bundleConf | ConvertFrom-Json
+            $bins = @($overlay.bundle.externalBin)
             if ($bins -notcontains 'binaries/codewhale-app-server') {
               Write-Host "::warning file=codewhale-desktop/$bundleConf::bundle.externalBin does not list binaries/codewhale-app-server"
             }
@@ -243,16 +263,25 @@ jobs:
             Write-Host "::warning::$bundleConf is not in the repository; creating it for this build"
             $json = '{ "bundle": { "externalBin": ["binaries/codewhale-app-server"] } }'
             [System.IO.File]::WriteAllText((Join-Path $PWD $bundleConf), $json)
+            $overlay = $json | ConvertFrom-Json
           }
           $tauriArgs = "--config $bundleConf"
 
-          # Tag builds: the app and installer version follow the tag (CI workspace only).
+          # Tag builds: the app and installer version follow the tag (CI workspace only). The
+          # version goes into ONE merged overlay together with externalBin: tauri-action reads
+          # the config named by the first --config to fill __VERSION__ and [version] in the asset
+          # names, so a second --config holding only the version would be ignored there.
           if ($env:RELEASE -eq 'true') {
-            $versionConf = 'src-tauri/tauri.release.conf.json'
-            $json = (@{ version = $env:APP_VERSION } | ConvertTo-Json -Compress)
-            [System.IO.File]::WriteAllText((Join-Path $PWD $versionConf), $json)
-            Write-Host "$versionConf -> $json"
-            $tauriArgs += " --config $versionConf"
+            $base = Get-Content -Raw -LiteralPath 'src-tauri/tauri.conf.json' | ConvertFrom-Json
+            if ([string]$base.version -ne $env:APP_VERSION) {
+              Write-Host "::warning file=codewhale-desktop/src-tauri/tauri.conf.json::version is $($base.version) but the tag says $($env:APP_VERSION); the build uses the tag. Bump tauri.conf.json (and package.json, Cargo.toml) in the repository."
+            }
+            $releaseConf = 'src-tauri/tauri.release.conf.json'
+            $overlay | Add-Member -NotePropertyName version -NotePropertyValue $env:APP_VERSION -Force
+            $json = $overlay | ConvertTo-Json -Depth 10 -Compress
+            [System.IO.File]::WriteAllText((Join-Path $PWD $releaseConf), $json)
+            Write-Host "$releaseConf -> $json"
+            $tauriArgs = "--config $releaseConf"
           }
 
           Write-Host "tauri build args: $tauriArgs"
@@ -285,7 +314,7 @@ jobs:
 
             Агент CodeWhale ${{ steps.meta.outputs.codewhale_version }} уже встроен в установщик, ставить его через npm не нужно.
 
-            Подробная инструкция (обновление, удаление, где лежат настройки): ${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/docs/INSTALL.md
+            Подробная инструкция (обновление, удаление, где лежат настройки): ${{ github.server_url }}/${{ github.repository }}/blob/${{ steps.meta.outputs.tag || github.ref_name }}/docs/INSTALL.md
 
       - name: Collect installers
         id: files
@@ -410,6 +439,7 @@ jobs:
         if: steps.meta.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ steps.meta.outputs.tag }}
           ZIP: ${{ steps.portable.outputs.zip }}
-        run: gh release upload "$env:TAG" "$env:ZIP" --clobber --repo "${{ github.repository }}"
+        run: gh release upload "$env:TAG" "$env:ZIP" --clobber
