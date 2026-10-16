@@ -46,7 +46,9 @@ fn defaults() -> Value {
         // Knowledge drive (removable 1 TB disk) and the tools its MCP server drives.
         "knowledgeDrive": { "root": null, "kiwixPort": 8090 },
         "godotPath": null,
-        "pythonPath": null
+        "pythonPath": null,
+        // ComfyUI asset factory: folder with main.py, interpreter, checkpoint for {{CHECKPOINT}}.
+        "comfy": { "url": "http://127.0.0.1:8188", "dir": null, "python": null, "checkpoint": null, "unloadLlm": true, "extraArgs": null, "workflowsDir": null }
     })
 }
 

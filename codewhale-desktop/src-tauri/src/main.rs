@@ -6,8 +6,10 @@ fn main() {
     // the app; CodeWhale starts it this way from ~/.codewhale/mcp.json. A GUI-subsystem exe
     // still gets the pipes its parent hands it, so stdin/stdout work here.
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.first().map(String::as_str) == Some("mcp-drive") {
-        std::process::exit(codewhale_desktop_lib::drive_mcp::main_from_args(&args[1..]));
+    match args.first().map(String::as_str) {
+        Some("mcp-drive") => std::process::exit(codewhale_desktop_lib::drive_mcp::main_from_args(&args[1..])),
+        Some("mcp-comfy") => std::process::exit(codewhale_desktop_lib::comfy_mcp::main_from_args(&args[1..])),
+        _ => {}
     }
     codewhale_desktop_lib::run()
 }

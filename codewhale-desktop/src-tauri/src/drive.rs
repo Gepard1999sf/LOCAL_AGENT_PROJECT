@@ -79,7 +79,7 @@ pub struct KiwixInfo {
 // Environment from settings
 // ---------------------------------------------------------------------------------------------
 
-fn setting<'a>(data: &'a Value, path: &[&str]) -> Option<&'a Value> {
+pub(crate) fn setting<'a>(data: &'a Value, path: &[&str]) -> Option<&'a Value> {
     path.iter()
         .try_fold(data, |v, k| v.get(k))
         .filter(|v| !v.is_null())
@@ -141,18 +141,18 @@ pub fn resource_path(app: &AppHandle, rel: &str) -> Option<PathBuf> {
     candidates.into_iter().find(|p| p.exists())
 }
 
-fn mcp_config_path() -> PathBuf {
+pub(crate) fn mcp_config_path() -> PathBuf {
     codewhale_home().join("mcp.json")
 }
 
-fn read_json_file(path: &Path) -> Value {
+pub(crate) fn read_json_file(path: &Path) -> Value {
     std::fs::read_to_string(path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_else(|| json!({}))
 }
 
-fn write_json_file(path: &Path, value: &Value) -> Result<(), String> {
+pub(crate) fn write_json_file(path: &Path, value: &Value) -> Result<(), String> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)
             .map_err(|e| format!("Не удалось создать {}: {e}", dir.display()))?;
@@ -167,7 +167,7 @@ fn write_json_file(path: &Path, value: &Value) -> Result<(), String> {
 }
 
 /// CodeWhale reads both `servers` and `mcpServers`; keep whichever the file already uses.
-fn servers_key(config: &Value) -> &'static str {
+pub(crate) fn servers_key(config: &Value) -> &'static str {
     if config.get("servers").is_none() && config.get("mcpServers").is_some() {
         "mcpServers"
     } else {
@@ -718,7 +718,7 @@ async fn ollama_models_var() -> Option<String> {
 
 /// Runs a PowerShell one-liner without a window; values go in through the environment so
 /// paths never need quoting.
-async fn powershell(script: &str, vars: &[(&str, &str)]) -> Result<String, String> {
+pub(crate) async fn powershell(script: &str, vars: &[(&str, &str)]) -> Result<String, String> {
     if !cfg!(windows) {
         return Err("Доступно только в Windows".into());
     }

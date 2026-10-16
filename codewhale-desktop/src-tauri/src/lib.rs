@@ -1,6 +1,9 @@
 mod api;
+mod comfy;
+pub mod comfy_mcp;
 mod drive;
 pub mod drive_mcp;
+pub mod mcp_core;
 mod models;
 mod ollama;
 mod runtime;
@@ -19,6 +22,7 @@ pub fn run() {
         .manage(api::Subscriptions::default())
         .manage(models::PullRegistry::default())
         .manage(drive::DriveProcs::default())
+        .manage(comfy::ComfyProcs::default())
         .setup(|app| {
             let settings = settings::Settings::load(app.handle());
             app.manage(settings);
@@ -63,6 +67,14 @@ pub fn run() {
             drive::drive_install_skills,
             drive::drive_install_helpers,
             drive::drive_golden_models,
+            comfy::comfy_status,
+            comfy::comfy_start,
+            comfy::comfy_stop,
+            comfy::comfy_register_mcp,
+            comfy::comfy_unregister_mcp,
+            comfy::comfy_install_templates,
+            comfy::comfy_free,
+            comfy::comfy_generate,
             system::gpu_stats,
             system::git_branch,
             system::path_info,

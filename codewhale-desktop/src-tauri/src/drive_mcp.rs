@@ -10,28 +10,24 @@
 //! Everything here is plain std + rusqlite so the same code runs inside the Tauri app
 //! (drive status, index build) and in the standalone server process.
 
+use crate::mcp_core::{self, McpServer, arg_num, arg_str, need_str, now_iso, read_json, run_with_timeout, tail, tool, truncate_chars, url_encode, write_json};
 use rusqlite::{Connection, OpenFlags, params};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::fs;
 use std::io::{BufRead, Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::process::Command;
+use std::time::{Duration, Instant};
 
 pub const SERVER_NAME: &str = "ai-drive";
-pub const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
-/// Newest protocol revision this server speaks; older ones are echoed back when asked for.
-pub const PROTOCOL_VERSION: &str = "2025-06-18";
-const KNOWN_PROTOCOLS: &[&str] = &["2024-11-05", "2025-03-26", "2025-06-18"];
+pub const INSTRUCTIONS: &str = "Оффлайн-база знаний на съёмном диске: документация (docset_*), исходники (code_*), дампы StackExchange (kiwix_*), символьная математика (math_eval), чтение логов с закладки и проверка Godot (godot_check) перед записью задачи в ledger.";
 pub const INDEX_REL: &str = "index/git_vault.sqlite";
 pub const DEFAULT_KIWIX_URL: &str = "http://127.0.0.1:8090";
 const MAX_INDEXED_FILE: u64 = 512 * 1024;
-const MAX_TOOL_TEXT: usize = 60_000;
+const MAX_TOOL_TEXT: usize = mcp_core::MAX_TOOL_TEXT;
 const MAX_READ_LINES: usize = 400;
 const PROCESS_TIMEOUT: Duration = Duration::from_secs(120);
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Drive layout from the user's plan (section 30 of the GameDev document), plus our index.
 pub const SECTIONS: &[(&str, &str)] = &[
@@ -219,104 +215,24 @@ pub fn default_root() -> &'static str {
 // JSON-RPC / MCP plumbing
 // ---------------------------------------------------------------------------------------------
 
-/// Runs the server until `input` ends. One JSON-RPC message per line, both ways.
-pub fn serve(env: &DriveEnv, input: impl BufRead, mut output: impl Write) -> std::io::Result<()> {
-    for line in input.lines() {
-        let line = line?;
-        if line.trim().is_empty() {
-            continue;
-        }
-        let reply = match serde_json::from_str::<Value>(&line) {
-            Ok(msg) => handle_message(env, &msg),
-            Err(e) => Some(
-                json!({"jsonrpc": "2.0", "id": Value::Null, "error": {"code": -32700, "message": format!("Parse error: {e}")}}),
-            ),
-        };
-        if let Some(reply) = reply {
-            output.write_all(reply.to_string().as_bytes())?;
-            output.write_all(b"\n")?;
-            output.flush()?;
-        }
+/// The `ai-drive` server description for the shared JSON-RPC loop.
+pub fn server(env: &DriveEnv) -> McpServer<'_> {
+    McpServer {
+        name: SERVER_NAME,
+        instructions: INSTRUCTIONS,
+        tools: tool_definitions(),
+        call: Box::new(move |name, args| call_tool(env, name, args)),
     }
-    Ok(())
+}
+
+/// Runs the server until `input` ends. One JSON-RPC message per line, both ways.
+pub fn serve(env: &DriveEnv, input: impl BufRead, output: impl Write) -> std::io::Result<()> {
+    mcp_core::serve(&server(env), input, output)
 }
 
 /// Handles one message; `None` for notifications (nothing to send back).
 pub fn handle_message(env: &DriveEnv, msg: &Value) -> Option<Value> {
-    let id = msg.get("id").cloned().unwrap_or(Value::Null);
-    let method = msg
-        .get("method")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    let params = msg.get("params").cloned().unwrap_or(Value::Null);
-    if method.starts_with("notifications/") {
-        return None;
-    }
-    let result: Result<Value, (i64, String)> = match method {
-        "initialize" => {
-            let asked = params
-                .get("protocolVersion")
-                .and_then(Value::as_str)
-                .unwrap_or(PROTOCOL_VERSION);
-            let version = if KNOWN_PROTOCOLS.contains(&asked) {
-                asked
-            } else {
-                PROTOCOL_VERSION
-            };
-            Ok(json!({
-                "protocolVersion": version,
-                "capabilities": { "tools": { "listChanged": false } },
-                "serverInfo": { "name": SERVER_NAME, "version": SERVER_VERSION },
-                "instructions": "Оффлайн-база знаний на съёмном диске: документация (docset_*), исходники (code_*), дампы StackExchange (kiwix_*), символьная математика (math_eval), чтение логов с закладки и проверка Godot (godot_check) перед записью задачи в ledger."
-            }))
-        }
-        "ping" => Ok(json!({})),
-        "tools/list" => Ok(json!({ "tools": tool_definitions() })),
-        "tools/call" => {
-            let name = params
-                .get("name")
-                .and_then(Value::as_str)
-                .unwrap_or_default();
-            let args = params
-                .get("arguments")
-                .cloned()
-                .unwrap_or_else(|| json!({}));
-            Ok(match call_tool(env, name, &args) {
-                Ok(text) => json!({ "content": [{ "type": "text", "text": clip(text) }] }),
-                Err(e) => {
-                    json!({ "content": [{ "type": "text", "text": clip(e) }], "isError": true })
-                }
-            })
-        }
-        "" => Err((-32600, "Invalid request: missing method".into())),
-        other => Err((-32601, format!("Method not found: {other}"))),
-    };
-    if id.is_null() {
-        return None;
-    }
-    Some(match result {
-        Ok(r) => json!({ "jsonrpc": "2.0", "id": id, "result": r }),
-        Err((code, message)) => {
-            json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
-        }
-    })
-}
-
-fn clip(mut s: String) -> String {
-    if s.chars().count() > MAX_TOOL_TEXT {
-        s = s.chars().take(MAX_TOOL_TEXT).collect();
-        s.push_str("\n[TRUNCATED]");
-    }
-    s
-}
-
-fn tool(name: &str, description: &str, props: Value, required: &[&str], read_only: bool) -> Value {
-    json!({
-        "name": name,
-        "description": description,
-        "inputSchema": { "type": "object", "properties": props, "required": required, "additionalProperties": false },
-        "annotations": { "readOnlyHint": read_only, "destructiveHint": false, "idempotentHint": read_only, "openWorldHint": false }
-    })
+    mcp_core::handle_message(&server(env), msg)
 }
 
 pub fn tool_definitions() -> Vec<Value> {
@@ -429,22 +345,6 @@ pub fn tool_definitions() -> Vec<Value> {
             true,
         ),
     ]
-}
-
-fn arg_str<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
-    args.get(key)
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-}
-fn need_str<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
-    arg_str(args, key).ok_or_else(|| format!("Нужен параметр {key}"))
-}
-fn arg_num(args: &Value, key: &str, default: usize, max: usize) -> usize {
-    args.get(key)
-        .and_then(Value::as_u64)
-        .map_or(default, |v| v as usize)
-        .clamp(1, max)
 }
 
 /// Runs one tool; `Ok` is the text handed to the model.
@@ -1105,20 +1005,6 @@ fn http_get(url: &str) -> Result<String, String> {
     resp.text().map_err(|e| e.to_string())
 }
 
-fn url_encode(s: &str) -> String {
-    let mut out = String::new();
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(b as char)
-            }
-            b' ' => out.push('+'),
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
-    }
-    out
-}
-
 pub fn kiwix_books(env: &DriveEnv) -> Result<Vec<KiwixBook>, String> {
     let xml = http_get(&format!("{}/catalog/v2/entries", env.kiwix_url))?;
     Ok(parse_kiwix_entries(&xml))
@@ -1363,18 +1249,6 @@ fn collapse_ws(s: &str) -> String {
     out.trim().to_string()
 }
 
-fn truncate_chars(s: &str, max: usize) -> String {
-    let total = s.chars().count();
-    if total <= max {
-        return s.to_string();
-    }
-    let mut out: String = s.chars().take(max).collect();
-    out.push_str(&format!(
-        "\n[TRUNCATED: показано {max} из {total} символов]"
-    ));
-    out
-}
-
 // ---------------------------------------------------------------------------------------------
 // SymPy
 // ---------------------------------------------------------------------------------------------
@@ -1429,23 +1303,6 @@ fn state_file(env: &DriveEnv, name: &str) -> Result<PathBuf, String> {
     fs::create_dir_all(&env.state_dir)
         .map_err(|e| format!("Не удалось создать {}: {e}", env.state_dir.display()))?;
     Ok(env.state_dir.join(name))
-}
-
-fn read_json(path: &Path, default: Value) -> Value {
-    fs::read_to_string(path)
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or(default)
-}
-
-fn write_json(path: &Path, value: &Value) -> Result<(), String> {
-    let tmp = path.with_extension("json.tmp");
-    fs::write(
-        &tmp,
-        serde_json::to_string_pretty(value).unwrap_or_default(),
-    )
-    .map_err(|e| format!("Не удалось записать {}: {e}", path.display()))?;
-    fs::rename(&tmp, path).map_err(|e| format!("Не удалось записать {}: {e}", path.display()))
 }
 
 /// Mirrors the reliability pattern from the user's plan: read only what is new since the last
@@ -1678,94 +1535,6 @@ pub fn godot_errors(output: &str) -> Vec<String> {
         }
     }
     errors
-}
-
-// ---------------------------------------------------------------------------------------------
-// Process helper
-// ---------------------------------------------------------------------------------------------
-
-/// Runs `cmd` with stdout+stderr captured, killing it after `timeout`. Returns the exit code and
-/// the combined output (stdout first).
-fn run_with_timeout(mut cmd: Command, timeout: Duration) -> Result<(i32, String), String> {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-    cmd.stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let program = cmd.get_program().to_string_lossy().to_string();
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("Не удалось запустить {program}: {e}"))?;
-    let mut stdout = child.stdout.take().unwrap();
-    let mut stderr = child.stderr.take().unwrap();
-    let out_thread = std::thread::spawn(move || {
-        let mut v = Vec::new();
-        let _ = stdout.read_to_end(&mut v);
-        v
-    });
-    let err_thread = std::thread::spawn(move || {
-        let mut v = Vec::new();
-        let _ = stderr.read_to_end(&mut v);
-        v
-    });
-    let started = Instant::now();
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(s)) => break s,
-            Ok(None) if started.elapsed() > timeout => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!(
-                    "{program} не ответил за {} с и был остановлен",
-                    timeout.as_secs()
-                ));
-            }
-            Ok(None) => std::thread::sleep(Duration::from_millis(40)),
-            Err(e) => return Err(format!("{program}: {e}")),
-        }
-    };
-    let mut out = String::from_utf8_lossy(&out_thread.join().unwrap_or_default()).into_owned();
-    let err = String::from_utf8_lossy(&err_thread.join().unwrap_or_default()).into_owned();
-    if !err.trim().is_empty() {
-        out.push('\n');
-        out.push_str(&err);
-    }
-    Ok((status.code().unwrap_or(-1), out.replace("\r\n", "\n")))
-}
-
-fn tail(s: &str, max_chars: usize) -> String {
-    let total = s.chars().count();
-    if total <= max_chars {
-        return s.trim().to_string();
-    }
-    format!(
-        "…{}",
-        s.chars().skip(total - max_chars).collect::<String>().trim()
-    )
-}
-
-fn now_iso() -> String {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    // Civil date from days since epoch (Howard Hinnant's algorithm); no chrono dependency.
-    let days = (secs / 86400) as i64;
-    let (h, m, s) = ((secs % 86400) / 3600, (secs % 3600) / 60, secs % 60);
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let mo = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if mo <= 2 { y + 1 } else { y };
-    format!("{y:04}-{mo:02}-{d:02}T{h:02}:{m:02}:{s:02}Z")
 }
 
 // ---------------------------------------------------------------------------------------------
