@@ -287,8 +287,16 @@ function applyOne(t: ThreadView, env: CwEventEnvelope, ev: CwEvent) {
       return;
     case "item.completed":
     case "item.failed":
-      if (p.item) upsertItem(t, { ...p.item, status: env.event === "item.failed" ? "failed" : p.item.status }, ts, true);
+    case "item.interrupted":
+    case "item.canceled": {
+      // The engine ends every open item of a stopped turn with item.interrupted /
+      // item.canceled (fixtures/live/mock_14_turn_interrupt__sse.json); without this
+      // a streaming reasoning block would stay "Думаю…" forever.
+      if (!p.item) return;
+      const forced = env.event === "item.completed" ? undefined : env.event.slice("item.".length);
+      upsertItem(t, { ...p.item, status: forced ?? p.item.status }, ts, true);
       return;
+    }
     case "item.delta": {
       const id = ev.item_id;
       if (!id) return;

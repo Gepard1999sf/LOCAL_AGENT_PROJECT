@@ -90,12 +90,11 @@ test.describe("Чат", () => {
     await expect(app.main.getByRole("button", { name: "Повторить" })).toBeVisible();
   });
 
-  test.fail(
+  test(
     "прерванные размышления не остаются в состоянии «Думаю…» (item.interrupted)",
     async ({ app, backend }) => {
-      // Known UI gap: store/threads.ts does not handle `item.interrupted` / `item.canceled`, which the
-      // runtime emits for streaming items of an interrupted turn (fixtures/live/mock_14_turn_interrupt__sse.json),
-      // so the reasoning block keeps its in-progress state. Remove test.fail once threads.ts handles them.
+      // The runtime ends streaming items of an interrupted turn with `item.interrupted`
+      // (fixtures/live/mock_14_turn_interrupt__sse.json); the reasoning block must leave its in-progress state.
       await app.boot();
       await app.ready();
       backend.scriptNextTurn(async (t) => {
