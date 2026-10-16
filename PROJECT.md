@@ -142,7 +142,7 @@ CodeWhale. Он заменяет TUI в PowerShell.
 | `codewhale-desktop/e2e/` | Playwright-тесты интерфейса с подменой Tauri и CodeWhale (**в работе**). |
 | `.github/workflows/ci.yml` | CI: проверка типов и сборка фронтенда, `cargo check` / `clippy` / `test` на Windows, e2e (**в работе**). |
 | `AGENTS.md` | Инструкции для самого агента CodeWhale в этом репозитории: отвечать по-русски, оболочка PowerShell 5.1, путь к Godot, проверка шейдеров. |
-| `tools/check-shader.ps1` | Проверяет компиляцию `.gdshader` в headless Godot (`F:\PROJECTS\godot-hd\engine\bin\godot.windows.editor.x86_64.exe`, проект `D:\AI\godot-shader-check`) и печатает `COMPILES` или ошибки. |
+| `tools/check-shader.ps1` | Проверяет компиляцию `.gdshader` в headless Godot (`F:\PROJECTS\godot-hd\engine\bin\godot.windows.editor.x86_64.exe`, другой путь — `-Godot` или `GODOT_BIN`) через проект `codewhale-desktop/src-tauri/resources/godot-check` из репозитория и печатает `COMPILES` или ошибки. |
 | `Godot/Scripting/Shaders/` | Рабочие файлы Godot (пример: `toon_water.gdshader`), над которыми работает агент. |
 | `.codewhale/` | Состояние CodeWhale для этого репозитория. Файлы `*.lock` в git не попадают. |
 
@@ -379,8 +379,9 @@ _Список после прохода исправлений: (заполня�
 - **Смена адреса Ollama не применяется к агенту сразу.** `OLLAMA_BASE_URL` передаётся CodeWhale
   только при запуске, поэтому после смены адреса нужно нажать «Перезапустить CodeWhale».
 - **После падения сервер сам не поднимается.** Нужно нажать «Перезапустить».
-- **Проверка шейдеров не воспроизводится из репозитория.** `tools/check-shader.ps1` зависит от проекта
-  `D:\AI\godot-shader-check` со скриптом `check.gd`, которого в репозитории нет.
+- ~~**Проверка шейдеров не воспроизводится из репозитория.**~~ Исправлено: `tools/check-shader.ps1`
+  использует проект `codewhale-desktop/src-tauri/resources/godot-check` (тот же `check.gd`, что и
+  инструмент `godot_check` MCP-сервера ai-drive).
 
 ---
 
@@ -394,15 +395,21 @@ _(заполняется по итогам исследования)_
 
 ### 7.2 Удобство работы с моделями
 
-_(заполняется по итогам исследования)_
+Менеджер моделей (`src/components/models/ModelManager.tsx`) подключён в оверлей «Модели Ollama»:
+загрузка с прогрессом, удаление, копирование, варианты с `num_ctx`, оценка VRAM. План моделей
+под железо пользователя — `docs/research/rtx5060-8gb-model-plan.md`.
 
 ### 7.3 Безопасность доступа к компьютеру
 
-_(заполняется по итогам исследования. Исходное состояние описано в разделе 3, «Подтверждения и безопасность».)_
+Синтез исследования и предлагаемая модель (посадка на сервере, гранты, откат по снимкам, хуки,
+ограничение путей в собственных MCP-серверах) — `docs/research/codewhale-safety-design.md`.
+Исходное состояние описано в разделе 3, «Подтверждения и безопасность».
 
 ### 7.4 Производительность локальных моделей
 
-_(заполняется по итогам исследования)_
+Настройки Ollama (`OLLAMA_KV_CACHE_TYPE=q8_0`, `KEEP_ALIVE`, `GPU_OVERHEAD`/`LLAMA_ARG_FIT_TARGET`),
+бюджет VRAM и чек-лист приёмки — `docs/research/rtx5060-8gb-model-plan.md`; проверка идей из
+PDF пользователя — `docs/research/user-pdf-verification.md`.
 
 ---
 
