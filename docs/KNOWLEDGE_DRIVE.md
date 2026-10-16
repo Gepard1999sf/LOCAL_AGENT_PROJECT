@@ -68,6 +68,8 @@ CodeWhale Desktop даёт агенту доступ к диску через в
    ```powershell
    # первый проход: модели + репозитории, без дампов Kiwix
    powershell -NoProfile -ExecutionPolicy Bypass -File F:\AI_Drive\bin\init-ai-drive.ps1 -DriveRoot F:\AI_Drive -SkipZim
+   # если модели Ollama уже лежат на другом диске (например D:\AI\ollama\models) и переносить их не нужно:
+   powershell -NoProfile -ExecutionPolicy Bypass -File F:\AI_Drive\bin\init-ai-drive.ps1 -DriveRoot F:\AI_Drive -SkipModels -SkipZim -KeepOllamaModels
    # потом, когда будет время: дампы GameDev SE и Blender SE
    powershell -NoProfile -ExecutionPolicy Bypass -File F:\AI_Drive\bin\init-ai-drive.ps1 -DriveRoot F:\AI_Drive -SkipModels -SkipRepos
    # математика и физика (Math SE, Physics SE, OpenStax, Jolt/Box2D/GLM)
