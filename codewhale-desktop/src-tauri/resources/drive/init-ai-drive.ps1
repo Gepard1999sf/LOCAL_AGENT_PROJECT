@@ -1,7 +1,8 @@
 ﻿# === Развёртывание диска знаний для CodeWhale Desktop (init-ai-drive.ps1) ===
 # Windows PowerShell 5.1. Запуск из корня съёмного диска или с любого места:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File init-ai-drive.ps1 -DriveRoot D:\AI_Drive
-# Ключи: -SkipModels -SkipRepos -SkipZim -Math (докачать базу математики и физики), -Full (StackOverflow ~90 ГБ).
+# Ключи: -SkipModels -SkipRepos -SkipZim -Math (докачать базу математики и физики), -Full (StackOverflow ~90 ГБ),
+#        -KeepOllamaModels (не трогать OLLAMA_MODELS: модели остаются там, где лежат сейчас).
 # Скрипт идемпотентный: уже скачанное не качает заново, прерванные загрузки докачиваются (BITS).
 param(
     [string]$DriveRoot = "D:\AI_Drive",
@@ -9,7 +10,8 @@ param(
     [switch]$SkipRepos,
     [switch]$SkipZim,
     [switch]$Math,
-    [switch]$Full
+    [switch]$Full,
+    [switch]$KeepOllamaModels
 )
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -46,11 +48,17 @@ $dirs = @("models", "docsets", "git_vault\gamedev", "git_vault\physics", "git_va
 foreach ($d in $dirs) { New-Item -ItemType Directory -Force -Path (Join-Path $DriveRoot $d) | Out-Null }
 Write-Host "  готово"
 
-Step "Хранилище моделей Ollama -> $DriveRoot\models (переменная пользователя OLLAMA_MODELS)"
-$models = Join-Path $DriveRoot "models"
-[Environment]::SetEnvironmentVariable("OLLAMA_MODELS", $models, "User")
-$env:OLLAMA_MODELS = $models
-Write-Host "  OLLAMA_MODELS=$models (перезапустите Ollama из трея, чтобы применилось)"
+if ($KeepOllamaModels) {
+    Step "Хранилище моделей Ollama не меняется (-KeepOllamaModels)"
+    $current = [Environment]::GetEnvironmentVariable("OLLAMA_MODELS", "User")
+    if ($current) { Write-Host "  OLLAMA_MODELS=$current" } else { Write-Host "  OLLAMA_MODELS не задана: модели в %USERPROFILE%\.ollama\models" }
+} else {
+    Step "Хранилище моделей Ollama -> $DriveRoot\models (переменная пользователя OLLAMA_MODELS)"
+    $models = Join-Path $DriveRoot "models"
+    [Environment]::SetEnvironmentVariable("OLLAMA_MODELS", $models, "User")
+    $env:OLLAMA_MODELS = $models
+    Write-Host "  OLLAMA_MODELS=$models (перезапустите Ollama из трея, чтобы применилось)"
+}
 
 if (-not $SkipModels) {
     Step "Золотой набор моделей (8 ГБ VRAM + 32 ГБ RAM)"
@@ -131,9 +139,12 @@ if (-not $SkipZim) {
 }
 
 Step "SymPy для символьной математики"
-if (Have "python") {
-    & python -c "import sympy" 2>$null
-    if ($LASTEXITCODE -ne 0) { & python -m pip install --user sympy } else { Write-Host "  уже установлен" }
+# `python` в PATH может оказаться заглушкой Microsoft Store; лаунчер `py` надёжнее.
+$python = $null
+if (Have "py") { $python = "py" } elseif (Have "python") { $python = "python" }
+if ($python) {
+    & $python -c "import sympy" 2>$null
+    if ($LASTEXITCODE -ne 0) { & $python -m pip install --user sympy } else { Write-Host "  уже установлен ($python)" }
 } else { Write-Host "  python не найден в PATH: установите Python 3 (python.org) и поставьте флажок Add to PATH" -ForegroundColor Yellow }
 
 Step "Готово"
