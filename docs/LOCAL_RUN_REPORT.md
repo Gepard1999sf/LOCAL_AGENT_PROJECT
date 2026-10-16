@@ -62,14 +62,21 @@
 - `powershell -NoProfile -File tools\check-shader.ps1 Godot\WaterDemo\water.gdshader` →
   `COMPILES: Godot\WaterDemo\water.gdshader (11 uniforms)` — готово.
 - `cargo clippy -- -D warnings` и `cargo test` в `src-tauri` на Windows — зелёные (47 тестов).
-- e2e на Windows — см. «Проблемы и обходные пути».
+- e2e на Windows: `cd codewhale-desktop\e2e; npm ci; .\node_modules\.bin\playwright test` →
+  **41 passed (36 s)** с переменной `CW_E2E_CHROMIUM` (см. «Проблемы и обходные пути»).
 
 ## Проблемы и обходные пути
 
 - **Playwright e2e:** `npx playwright install chromium` в `codewhale-desktop\e2e` скачал сборку
   Chromium 1234 (npx подхватил другой Playwright), а `@playwright/test` 1.56.1 ждёт
-  `chromium_headless_shell-1194` — все 41 тест падали на `browserType.launch`. Обход: ставить
-  браузер бинарником из пакета: `.\node_modules\.bin\playwright install chromium`.
+  `chromium_headless_shell-1194` — все 41 тест падали на `browserType.launch`. Загрузка нужной
+  сборки через `.\node_modules\.bin\playwright install chromium-headless-shell` на этой машине
+  зависала на десятки минут (стояла блокировка `ms-playwright\__dirlock`, папка оставалась
+  неполной). Рабочий обход: запускать тесты с уже скачанным Chromium через переменную из
+  `playwright.config.ts`:
+  `$env:CW_E2E_CHROMIUM='C:\Users\Stryker\AppData\Local\ms-playwright\chromium-1234\chrome-win64\chrome.exe'; .\node_modules\.bin\playwright test`
+  → 41 passed. Когда сеть позволит, достаточно один раз выполнить
+  `.\node_modules\.bin\playwright install chromium-headless-shell` и переменная не нужна.
 - **Python:** команда `python` ведёт на алиас Microsoft Store («Python was not found»); рабочий
   интерпретатор — `py` (Python 3.14.6). `sympy` поставлен через `py -m pip install sympy`.
 - **Репозиторий:** скачанный zip (`claude/optimistic-ride-hu7e74`) не был git-клоном; в папке
