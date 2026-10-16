@@ -12,6 +12,13 @@ ComfyUI, проверяется только здесь. Выполняй раз
 Windows PowerShell 5.1: без `&&`, без grep/sed; Godot 4.8 лежит в
 `F:\PROJECTS\godot-hd\engine\bin\godot.windows.editor.x86_64.exe`).
 
+**Как запустить локальную сессию.** В PowerShell перейти в папку репозитория, выполнить
+`git fetch origin claude/optimistic-ride-hu7e74` и `git checkout claude/optimistic-ride-hu7e74`
+(в скачанном zip ветка уже распакована), затем `claude` и первым сообщением:
+«Прочитай `docs/HANDOFF_LOCAL_SESSION.md` и выполняй разделы 1–9 по порядку, после каждого
+раздела коротко отчитывайся». PDF-версия этого файла (`docs/HANDOFF_LOCAL_SESSION.pdf`) —
+копия для чтения, источник истины — Markdown в репозитории.
+
 ## 0. Что уже сделано (не переделывать)
 
 | Компонент | Где | Проверено в облаке |
