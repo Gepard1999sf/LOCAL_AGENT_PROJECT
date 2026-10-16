@@ -9,8 +9,9 @@
 
 | Раздел | Статус | Почему / что проверить | Проверено в облаке 2026-10-16 |
 | --- | --- | --- | --- |
+| 0a. Порядок на ПК (аудит, сортировка) | не проверено | `tools\pc-organize\Invoke-PcAudit.ps1`, затем `Invoke-PcOrganize.ps1` (пробный прогон → `-Apply`) | скрипты проверены парсером и самотестом под PowerShell 7 в Linux |
 | 1. Проверка окружения | не проверено | нужны версии Node/Rust/Ollama/Python/Godot/WebView2/nvidia-smi с машины | — |
-| 2. Сборка и первый запуск | не проверено | `npm run tauri dev`, окно, модель в заголовке, ответ в чате | `npx tsc --noEmit`, `npm run build` (Vite) — зелёные |
+| 2. Сборка и первый запуск | не проверено | `npm run tauri dev`, окно, модель в заголовке, ответ в чате | `npx tsc --noEmit`, `npm run build` (Vite), `cargo clippy -- -D warnings`, `cargo test` (47 тестов) — зелёные под Linux |
 | 3. Настройки приложения | не проверено | модель по умолчанию с инструментами и `num_ctx` ≥ 16k, папка диска, путь к Godot, автоподтверждение ai-drive | — |
 | 4. Диск знаний | не проверено | подготовка, наполнение (`init-ai-drive.ps1`), индекс, Kiwix, скиллы, MCP, `mcp-drive status` / `godot_check` → `"ok": true, "uniforms": 11` | — |
 | 5. Финальный тест: шейдер воды | не проверено | настоящая модель пишет `water.gdshader`, `godot_check`, `ledger_record`, рендер `D:\water.png` | сквозной тест с `mock_ollama.py` (`docs/FINAL_TEST_WATER.md`) |

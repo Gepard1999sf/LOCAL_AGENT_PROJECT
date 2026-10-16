@@ -142,6 +142,7 @@ CodeWhale. Он заменяет TUI в PowerShell.
 | `codewhale-desktop/e2e/` | Playwright-тесты интерфейса с подменой Tauri и CodeWhale (**в работе**). |
 | `.github/workflows/ci.yml` | CI: проверка типов и сборка фронтенда, `cargo check` / `clippy` / `test` на Windows, e2e (**в работе**). |
 | `AGENTS.md` | Инструкции для самого агента CodeWhale в этом репозитории: отвечать по-русски, оболочка PowerShell 5.1, путь к Godot, проверка шейдеров. |
+| `tools/pc-organize/` | Аудит и порядок на ПК пользователя: `Invoke-PcAudit.ps1` (только чтение: система, программы, автозагрузка, место, кэши, «Загрузки», кандидаты на удаление → отчёт `.md`/`.json`), `Invoke-PcOrganize.ps1` (сортировка «Загрузок» по категориям, софт в `<Root>\Software`, проекты и папки CodeWhale в `<Root>\AI`/`PROJECTS`; пробный прогон по умолчанию, журнал и `-Undo`), `Test-PcOrganize.ps1` (самотест в песочнице), `README.md`. |
 | `tools/check-shader.ps1` | Проверяет компиляцию `.gdshader` в headless Godot (`F:\PROJECTS\godot-hd\engine\bin\godot.windows.editor.x86_64.exe`, другой путь — `-Godot` или `GODOT_BIN`) через проект `codewhale-desktop/src-tauri/resources/godot-check` из репозитория и печатает `COMPILES` или ошибки. |
 | `Godot/Scripting/Shaders/` | Рабочие файлы Godot (пример: `toon_water.gdshader`), над которыми работает агент. |
 | `.codewhale/` | Состояние CodeWhale для этого репозитория. Файлы `*.lock` в git не попадают. |
