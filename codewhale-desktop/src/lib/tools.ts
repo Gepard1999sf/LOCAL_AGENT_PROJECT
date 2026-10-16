@@ -62,6 +62,7 @@ export const APPROVABLE_TOOLS: Array<{ name: string; label: string; risk: ToolMe
   { name: "apply_patch", label: "apply_patch: патчи", risk: "write" },
   { name: "bash", label: "bash: команды PowerShell", risk: "exec" },
   { name: "Web", label: "Web: доступ в интернет", risk: "network" },
+  { name: "ai_drive", label: "ai-drive: диск знаний (поиск, документация, проверка Godot)", risk: "safe" },
 ];
 
 /** Tools given to local models in the "lite" profile: fewer schemas, ~6k tokens less prompt. */

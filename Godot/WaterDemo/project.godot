@@ -1,0 +1,20 @@
+; Engine configuration file.
+; Water demo used by the final knowledge-drive test: a Gerstner-wave water shader rendered
+; headless (Xvfb + OpenGL compatibility) into a PNG by water_demo.gd.
+config_version=5
+
+[application]
+
+config/name="WaterDemo"
+run/main_scene="res://water_demo.tscn"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

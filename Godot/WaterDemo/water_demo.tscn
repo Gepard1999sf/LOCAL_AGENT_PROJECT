@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cwaterdemo0001"]
+
+[ext_resource type="Script" path="res://water_demo.gd" id="1_demo"]
+
+[node name="WaterDemo" type="Node3D"]
+script = ExtResource("1_demo")

@@ -13,6 +13,11 @@ Scenario is chosen from the LAST user message text:
   contains "[tool:write]"  -> model calls the write tool (approval path)
   contains "[tool:bash]"   -> model calls the bash/shell tool (approval path)
   contains "[slow]"        -> slow stream (for interrupt tests)
+  contains "[shader]"      -> three-step GameDev scenario used by the knowledge-drive
+                              final test: write water.gdshader (content from the file in
+                              MOCK_SHADER_FILE), check it with the ai-drive MCP tool
+                              godot_check (path MOCK_WORKSPACE/water.gdshader), then
+                              summarise the check result
   otherwise                -> plain streamed answer with reasoning deltas
 
 Usage: python3 -I mock_ollama.py --port 11434 --log requests.jsonl
@@ -20,6 +25,8 @@ Usage: python3 -I mock_ollama.py --port 11434 --log requests.jsonl
 
 import argparse
 import json
+import os
+import re
 import sys
 import threading
 import time
@@ -38,16 +45,68 @@ def log_request(path, body):
 
 
 def last_user_text(messages):
+    """Text of the user's latest prompt. CodeWhale appends internal
+    `<codewhale:runtime_event …>` user messages (MCP notices etc.) after the
+    prompt; those are skipped so scenario markers in the prompt still match."""
     for msg in reversed(messages or []):
         if msg.get("role") == "user":
             content = msg.get("content")
-            if isinstance(content, str):
-                return content
             if isinstance(content, list):
-                return " ".join(
+                content = " ".join(
                     part.get("text", "") for part in content if isinstance(part, dict)
                 )
+            if not isinstance(content, str):
+                continue
+            if content.lstrip().startswith("<codewhale:runtime_event"):
+                continue
+            return content
     return ""
+
+
+def tool_results(messages):
+    """Tool-result messages so far, oldest first (text content)."""
+    out = []
+    for msg in messages or []:
+        if msg.get("role") == "tool":
+            content = msg.get("content")
+            if isinstance(content, list):
+                content = " ".join(part.get("text", "") for part in content if isinstance(part, dict))
+            out.append(str(content or ""))
+    return out
+
+
+def shader_step(messages, available):
+    """(tool_call, text, reasoning) for the [shader] scenario, by how many tools ran."""
+    results = tool_results(messages)
+    shader_file = os.environ.get("MOCK_SHADER_FILE", "")
+    workspace = os.environ.get("MOCK_WORKSPACE", ".")
+    if not results:
+        try:
+            with open(shader_file, encoding="utf-8") as fh:
+                code = fh.read()
+        except OSError:
+            code = "shader_type spatial;\nvoid fragment() { ALBEDO = vec3(0.0, 0.3, 0.6); }\n"
+        name = pick_tool(available, ["write", "write_file"])
+        return (name, {"path": "water.gdshader", "content": code}) if name else (None, "Нет инструмента write.", "")
+    # Did we already call godot_check? Look at our own tool calls, not at the result text
+    # (CodeWhale may wrap or escape tool output).
+    called_check = any(
+        (tc.get("function") or {}).get("name", "").endswith("_godot_check")
+        for msg in messages or [] if msg.get("role") == "assistant"
+        for tc in msg.get("tool_calls") or []
+    )
+    if called_check:
+        last = results[-1]
+        ok = re.search(r'\\?"ok\\?":\s*true', last) is not None
+        verdict = "прошла" if ok else "НЕ прошла"
+        return None, f"Шейдер water.gdshader записан, проверка Godot {verdict}. Результат godot_check: {last[:400]}", "Проверка выполнена, подвожу итог."
+    name = next((t for t in available if t.endswith("_godot_check")), None)
+    if name:
+        return name, {"path": workspace.rstrip("/\\") + "/water.gdshader"}
+    # MCP tools are deferred: CodeWhale asks the model to tool_search the server name first.
+    if "tool_search" in available and len(results) < 3:
+        return "tool_search", {"query": "ai-drive godot_check"}
+    return None, "Инструмент godot_check недоступен: " + ", ".join(available), "MCP-сервер ai-drive не подключён."
 
 
 def tool_names(body):
@@ -153,7 +212,14 @@ class Handler(BaseHTTPRequestHandler):
         text = "Привет! Это ответ тестовой модели (mock Ollama)."
         reasoning = "Пользователь поздоровался, отвечаю кратко."
         delay = 0.03
-        if last_role == "tool":
+        if "[shader]" in prompt:
+            step = shader_step(messages, available)
+            if step[0]:
+                tool_call = (step[0], step[1])
+                reasoning = "Пишу шейдер воды и проверяю его в Godot." if last_role != "tool" else "Файл записан, запускаю проверку godot_check."
+            else:
+                text, reasoning = step[1], step[2] or reasoning
+        elif last_role == "tool":
             text = "Готово: инструмент выполнен, результат получен."
             reasoning = "Инструмент вернул результат, подвожу итог."
         elif "[tool:read]" in prompt:

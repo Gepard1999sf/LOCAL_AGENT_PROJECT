@@ -39,7 +39,8 @@ fn defaults() -> Value {
             "write": false,
             "apply_patch": false,
             "bash": false,
-            "Web": false
+            "Web": false,
+            "ai_drive": true
         },
         "language": "ru",
         // Knowledge drive (removable 1 TB disk) and the tools its MCP server drives.

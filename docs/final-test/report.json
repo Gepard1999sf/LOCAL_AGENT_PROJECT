@@ -1,0 +1,93 @@
+{
+  "ok": true,
+  "steps": [
+    {
+      "step": "mock ollama",
+      "ok": true,
+      "port": 57775
+    },
+    {
+      "step": "codewhale app-server",
+      "ok": true,
+      "port": 55505
+    },
+    {
+      "step": "runtime info",
+      "ok": true,
+      "version": "0.10.2"
+    },
+    {
+      "step": "create thread",
+      "ok": true,
+      "thread_id": "thr_8d7eb0ecc97a4602a80223ec5a379146"
+    },
+    {
+      "step": "post turn",
+      "ok": true,
+      "status": 201
+    },
+    {
+      "step": "turn finished",
+      "ok": true,
+      "ending": "turn.completed",
+      "tools": [
+        {
+          "kind": "file_change",
+          "summary": "write: [approval] This tool call required approval and was approved by the user before execution.\n\nSuccessfully wrote 40",
+          "status": "completed"
+        },
+        {
+          "kind": "tool_call",
+          "summary": "tool_search: {\"type\":\"tool_search_tool_search_result\",\"tool_references\":[{\"type\":\"tool_reference\",\"tool_name\":\"mcp_ai-dr",
+          "status": "completed"
+        },
+        {
+          "kind": "tool_call",
+          "summary": "mcp_ai-drive_godot_check: [approval] This tool call required approval and was approved by the user before execution.\n\n{\"",
+          "status": "completed"
+        }
+      ],
+      "approvals": [
+        {
+          "id": "approval_5daa230938e243be8933a60a1c9b45e9",
+          "tool": "write",
+          "summary": "Write water.gdshader"
+        },
+        {
+          "id": "approval_b1634f9f2552439c810d91cecc4047c5",
+          "tool": "mcp_ai-drive_godot_check",
+          "summary": "Godot check: water.gdshader (ai-drive)"
+        }
+      ],
+      "mcp_tools": []
+    },
+    {
+      "step": "shader written by agent",
+      "ok": true,
+      "path": "/tmp/cwfinal-37kuqntr/proj/water.gdshader",
+      "bytes": 4036
+    },
+    {
+      "step": "godot_check called through MCP",
+      "ok": true
+    },
+    {
+      "step": "agent reported the check",
+      "ok": true,
+      "final_text": "Шейдер water.gdshader записан, проверка Godot прошла. Результат godot_check: [approval] This tool call required approval and was approved by the user before execution.\n\n{\"content\":[{\"text\":\"{\\n  \\\"errors\\\": [],\\n  \\\"exitCode\\\": 0,\\n  \\\"kind\\\": \\\"shader\\\",\\n  \\\"ok\\\": true,\\n  \\\"outputTail\\\": \\\"Godot "
+    },
+    {
+      "step": "godot_check verdict",
+      "ok": true,
+      "uniforms": 11,
+      "errors": []
+    },
+    {
+      "step": "render under xvfb",
+      "ok": true,
+      "png": "/tmp/claude-0/-home-user-LOCAL-AGENT-PROJECT/dfc6ae91-fcd0-5718-90b8-d857a427b4cb/scratchpad/final/water.png",
+      "tail": "ummy driver.\n     at: initialize (servers/audio/audio_server.cpp:258)\n\nSHOT_SAVED /tmp/claude-0/-home-user-LOCAL-AGENT-PROJECT/dfc6ae91-fcd0-5718-90b8-d857a427b4cb/scratchpad/final/water.png 1280x720\n"
+    }
+  ],
+  "note": "Запуск 2026-10-16 в Linux-контейнере: CodeWhale 0.10.2 (debug), codewhale-desktop mcp-drive, Godot 4.7.2 headless + Xvfb/llvmpipe, модель — сценарный mock_ollama.py ([shader])."
+}

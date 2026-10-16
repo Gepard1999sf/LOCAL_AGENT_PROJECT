@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS = {
     apply_patch: false,
     bash: false,
     Web: false,
+    ai_drive: true,
   } as Record<string, boolean>,
   language: "ru",
   knowledgeDrive: { root: null as string | null, kiwixPort: 8090 },

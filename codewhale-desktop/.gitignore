@@ -25,3 +25,7 @@ dist-ssr
 
 # Sidecar binary (128 MB), copied from the npm install of codewhale
 src-tauri/binaries/
+
+# Playwright output when the e2e suite is run from this folder
+test-results/
+playwright-report/

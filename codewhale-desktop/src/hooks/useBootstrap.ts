@@ -60,7 +60,10 @@ function onEvent(env: CwEventEnvelope) {
         const tool: string | undefined = p?.tool_name;
         const id: string | undefined = p?.approval_id ?? p?.id;
         const rules = useApp.getState().settings?.autoApprove ?? {};
-        if (tool && id && rules[tool] && t.approvals[id]?.status === "pending") {
+        // Knowledge-drive tools (search, docs, Godot check) are read-only; one rule covers them.
+        // CodeWhale names them mcp_ai-drive_* in approvals and mcp_ai--drive_* towards the model.
+        const allowed = !!tool && (rules[tool] || (/^mcp_ai-+drive_/.test(tool) && rules.ai_drive));
+        if (tool && id && allowed && t.approvals[id]?.status === "pending") {
           app.decideApproval(env.threadId, id, true);
         }
       }, 60);
