@@ -1,9 +1,10 @@
 # Передача в локальную сессию Claude Code (Windows, машина пользователя)
 
 Этот документ — задание для сессии Claude Code, запущенной **на компьютере пользователя**
-в папке репозитория (ветка `claude/optimistic-ride-hu7e74`, например
-`C:\Users\Stryker\Downloads\LOCAL_AGENT_PROJECT-claude-optimistic-ride-hu7e74`
-или свежий `git clone`). Облачная сессия (Linux, без GPU, без Windows SDK, без реестра Ollama)
+в папке репозитория (актуальная ветка — **`claude/busy-darwin-juot7g`**: в ней всё из
+`claude/optimistic-ride-hu7e74` плюс доработки облачной сессии от 2026-10-16, см. раздел 8;
+например `C:\Users\Stryker\Downloads\LOCAL_AGENT_PROJECT-claude-optimistic-ride-hu7e74` после
+`git fetch`, или свежий `git clone`). Облачная сессия (Linux, без GPU, без Windows SDK, без реестра Ollama)
 довела код до зелёных проверок, но всё, что требует Windows, видеокарты, живой модели, Godot и
 ComfyUI, проверяется только здесь. Выполняй разделы по порядку, каждый заканчивается
 критерием «готово».
@@ -13,8 +14,9 @@ Windows PowerShell 5.1: без `&&`, без grep/sed; Godot 4.8 лежит в
 `F:\PROJECTS\godot-hd\engine\bin\godot.windows.editor.x86_64.exe`).
 
 **Как запустить локальную сессию.** В PowerShell перейти в папку репозитория, выполнить
-`git fetch origin claude/optimistic-ride-hu7e74` и `git checkout claude/optimistic-ride-hu7e74`
-(в скачанном zip ветка уже распакована), затем `claude` и первым сообщением:
+`git fetch origin claude/busy-darwin-juot7g` и `git checkout claude/busy-darwin-juot7g`
+(в скачанном zip распакована более старая ветка `claude/optimistic-ride-hu7e74` — нужен
+`git fetch`), затем `claude` и первым сообщением:
 «Прочитай `docs/HANDOFF_LOCAL_SESSION.md` и выполняй разделы 1–9 по порядку, после каждого
 раздела коротко отчитывайся». PDF-версия этого файла (`docs/HANDOFF_LOCAL_SESSION.pdf`) —
 копия для чтения, источник истины — Markdown в репозитории.
@@ -23,7 +25,7 @@ Windows PowerShell 5.1: без `&&`, без grep/sed; Godot 4.8 лежит в
 
 | Компонент | Где | Проверено в облаке |
 | --- | --- | --- |
-| Десктоп-клиент CodeWhale (Tauri 2 + React) | `codewhale-desktop/` | tsc, vite build, 33 e2e (моки IPC), clippy, 47 Rust-тестов; CI на `windows-latest` зелёный |
+| Десктоп-клиент CodeWhale (Tauri 2 + React) | `codewhale-desktop/` | tsc, vite build, 41 e2e (моки IPC, включая менеджер моделей), clippy, 47 Rust-тестов; CI на `windows-latest` зелёный |
 | MCP-сервер `ai-drive` (диск знаний) | `src-tauri/src/drive_mcp.rs`, команды `src-tauri/src/drive.rs`, панель `src/components/drive/` | сквозной тест с настоящим CodeWhale + Godot 4.7.2 headless (`docs/FINAL_TEST_WATER.md`, `docs/final-test/water.png`) |
 | MCP-сервер `comfy` (фабрика ассетов) | `src-tauri/src/comfy_mcp.rs`, `src-tauri/src/comfy.rs`, панель `src/components/comfy/` | против стенда `mock_comfy.py` с формами API ComfyUI v0.11 (`final_test_comfy.py`, 17/17) |
 | Скиллы, шаблоны, скрипты | `src-tauri/resources/` (skills/, comfy/, drive/, godot-check/) | синтаксис, юнит-тесты |
@@ -31,9 +33,10 @@ Windows PowerShell 5.1: без `&&`, без grep/sed; Godot 4.8 лежит в
 | Установщик/portable | `.github/workflows/release.yml` (NSIS setup, MSI, portable zip) | релиз v0.1.0 опубликован, SHA-256 трёх файлов сверены — см. раздел 7 |
 | Документация | `docs/INSTALL.md`, `docs/KNOWLEDGE_DRIVE.md`, `docs/COMFYUI.md`, `docs/FINAL_TEST_WATER.md`, `PROJECT.md` | — |
 
-Исследовательские материалы агентов лежат в `docs/research/` (JSON/MD): их синтез (модель
-безопасности, план моделей под RTX 5060 8 ГБ, верификация PDF) не завершён — это отдельная
-задача, не блокирует запуск.
+Исследовательские материалы агентов лежат в `docs/research/` (JSON/MD); их синтез готов
+(2026-10-16): `codewhale-safety-design.md` (модель безопасности), `rtx5060-8gb-model-plan.md`
+(план моделей под RTX 5060 8 ГБ), `user-pdf-verification.md` (верификация PDF пользователя).
+Перед разделами 3–5 полезно прочитать план моделей: какую модель и с каким `num_ctx` брать.
 
 ## 1. Проверка окружения (10 минут)
 
@@ -79,13 +82,18 @@ npm run tauri dev           # первая сборка Rust 10–20 минут
 Настройки (`Ctrl+,`):
 - **Ollama → Модель по умолчанию**: модель с инструментами и контекстом ≥ 16k (панель
   «Модели Ollama» умеет создать вариант с нужным `num_ctx`; контекст 4k по умолчанию — ловушка).
-- **Диск знаний и Godot**: папка диска (`D:\AI_Drive` или другая), путь к `godot.exe`.
+- **Диск знаний и Godot**: папка диска (у пользователя `F:\AI_Drive`; в примерах ниже `D:\AI_Drive`), путь к `godot.exe`.
 - **Агент → автоподтверждение**: правило **ai-drive** включено по умолчанию (иначе каждый
   поиск по диску просит подтверждение).
 
 Критерий: настройки сохранены (файл `%APPDATA%\codewhale-desktop\settings.json`).
 
 ## 4. Диск знаний
+
+Корень диска знаний — любая папка на большом диске. У пользователя это **`F:\AI_Drive`** (рядом с
+`F:\PROJECTS\godot-hd`); пошаговый план именно для `F:` с размерами, ключами скрипта и проверками —
+`docs/KNOWLEDGE_DRIVE.md`, раздел «Диск F: как диск знаний». В примерах ниже вместо `D:\AI_Drive`
+подставляй `F:\AI_Drive`.
 
 Панель `Ctrl+K` → «Диск знаний»:
 1. **Подготовить диск** → в `<диск>\bin` появятся `sympy_helper.py` и `init-ai-drive.ps1`.
@@ -181,15 +189,31 @@ npm run bundle    # NSIS + MSI в <CARGO_TARGET_DIR>\release\bundle\
 
 ## 8. Прочие хвосты (после основного)
 
-- `src/components/models/ModelManager.tsx` (полный менеджер моделей: загрузка, удаление,
-  варианты, оценка VRAM) написан и команды `models_*` зарегистрированы, но в оверлее
-  «models» всё ещё старая `ModelsPanel`. Подключить `ModelManager`, добавить моки `models_*`
-  в `e2e/mock/backend.ts`, прогнать e2e.
-- e2e на Windows: `cd codewhale-desktop\e2e; npm ci; npx playwright install chromium; npx playwright test`.
-- `release.yml` не проходил независимое ревью; `tools\check-shader.ps1` ссылается на проект
-  `D:\AI\godot-shader-check` — его можно заменить на `codewhale-desktop\src-tauri\resources\godot-check`.
-- Исследования в `docs/research/` ждут синтеза (безопасность: `codewhale-safety-design`;
-  модели под RTX 5060: `rtx5060-8gb-model-plan`; верификация PDF пользователя).
+Сделано в облаке 2026-10-16 (ветка `claude/busy-darwin-juot7g`, не переделывать):
+- `ModelManager` (загрузка с прогрессом, удаление, копирование, варианты с `num_ctx`, оценка
+  VRAM, вкладка «Запущенные») подключён в оверлей «Модели Ollama» вместо старой `ModelsPanel`
+  (`src/components/overlays/SidePanels.tsx`). Моки `models_*` — `e2e/mock/backend.ts` и
+  `e2e/mock/defaults.ts` (прогресс `models_pull` идёт в `Channel` страницы), 8 тестов —
+  `e2e/tests/models.spec.ts`; весь набор e2e (41 тест) зелёный под Linux.
+- `tools\check-shader.ps1` использует проект `codewhale-desktop\src-tauri\resources\godot-check`
+  из репозитория (другой путь к Godot: `-Godot <exe>` или переменная `GODOT_BIN`).
+- `release.yml` прошёл ревью: отказ публиковать `publish_tag`, который уже указывает на другой
+  коммит; одна объединённая `--config` (версия из тега + sidecar) вместо двух, чтобы
+  tauri-action подставлял версию тега в имя релиза и файлов; предупреждение, если
+  `tauri.conf.json` не совпадает с тегом; ссылка на `INSTALL.md` по тегу; `GH_REPO` через env.
+  Запуском не проверялось — смотреть при релизе v0.2.0.
+- Синтез исследований: `docs/research/codewhale-safety-design.md`,
+  `docs/research/rtx5060-8gb-model-plan.md`, `docs/research/user-pdf-verification.md`;
+  ссылки — `PROJECT.md`, раздел 7. Заготовка отчёта — `docs/LOCAL_RUN_REPORT.md`.
+
+Осталось на машине пользователя:
+- e2e на Windows: `cd codewhale-desktop\e2e; npm ci; npx playwright install chromium; npx playwright test`
+  (ожидается 41 passed).
+- `powershell -NoProfile -File tools\check-shader.ps1 Godot\WaterDemo\water.gdshader` →
+  `COMPILES: ... (11 uniforms)`.
+- Проверки из `docs/research/user-pdf-verification.md`, раздел 5 (скорость MoE на 8 ГБ,
+  код возврата `--check-only`, эффект `LLAMA_ARG_FIT_TARGET` при открытом Godot и др.) и
+  чек-лист приёмки модели из `docs/research/rtx5060-8gb-model-plan.md`, раздел 6.
 - Контейнерные находки, которые стоит учитывать: MCP-инструменты в CodeWhale отложенные
   (`tool_search` обязателен), имена видны модели как `mcp_ai--drive_*`/`mcp_comfy_*`;
   `readOnlyHint` не снимает подтверждение для пользовательских серверов; в Compatibility-рендере
@@ -197,8 +221,8 @@ npm run bundle    # NSIS + MSI в <CARGO_TARGET_DIR>\release\bundle\
 
 ## 9. Как отчитываться
 
-В конце — короткий отчёт в `docs/LOCAL_RUN_REPORT.md`: таблица разделов 1–7 с «готово /
-не готово / почему», версии (Windows, Node, Rust, Ollama, модель, ComfyUI, Godot), что
-поменяно в коде. Коммиты — в ту же ветку `claude/optimistic-ride-hu7e74`, небольшими
+В конце — короткий отчёт в `docs/LOCAL_RUN_REPORT.md` (заготовка уже в репозитории: таблица
+разделов 1–7 с «готово / не готово / почему», версии (Windows, Node, Rust, Ollama, модель,
+ComfyUI, Godot), что поменяно в коде). Коммиты — в ту же ветку `claude/busy-darwin-juot7g`, небольшими
 осмысленными порциями, с проверкой `npx tsc --noEmit` и `cargo clippy -- -D warnings`
 (в `src-tauri`) перед каждым.
