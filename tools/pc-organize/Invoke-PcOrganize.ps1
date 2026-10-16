@@ -327,7 +327,13 @@ if ($SortDesktop -and -not $PlanFile -and -not $Undo) {
             }
             '^CodeWhale_Workspace$' { if ($MoveWorkFolders) { Add-Move 'Desktop' $d.FullName $L.OldProjects 'старый клон репозитория (один коммит); рабочая копия — в AI\CodeWhale; ярлык CodeWhale_Local.lnk и workspace в настройках приложения перенастроить' }; continue }
             '^Crystall_UI_preview$' { Add-Move 'Desktop' $d.FullName $L.WorkCs; continue }
-            '^Godot_v.*\.exe$' { if ($MovePortable) { Add-Move 'Desktop' $d.FullName $L.Portable 'портативный Godot 4.7.2' 'Godot-4.7.2' }; continue }
+            '^Godot_v.*\.exe$' {
+                if ($MovePortable) {
+                    foreach ($f in (Get-ChildItem -LiteralPath $d.FullName -File -Force)) { Add-Move 'Desktop' $f.FullName (Join-Path $L.Portable 'Godot-4.7.2') 'портативный Godot 4.7.2' }
+                    Add-Delete 'Desktop' $d.FullName 'после переноса exe останется пустой'
+                }
+                continue
+            }
             '^Octagon-Servers$' { Add-Manual 'Desktop' $d.FullName "приватный SSH-ключ и known_hosts; ssh_config ссылается на путь на рабочем столе. Переносить вручную в $home_\.ssh\octagon-servers и поправить пути в ssh_config"; continue }
             '^Salaries_app$' { Add-Move 'Desktop' $d.FullName $L.WorkSalary; continue }
             default {
@@ -418,14 +424,16 @@ function Move-Entry([string]$Source, [string]$Destination, [string]$Type) {
         return [pscustomobject]@{ Status = 'OK'; Final = $final; Note = '' }
     }
     # Directory across volumes: robocopy /MOVE (handles long paths, copies attributes/timestamps).
+    # Exit code is a bit mask: 1 copied, 2 extras, 4 mismatches, 8 some files failed, 16 fatal.
     $rc = & robocopy.exe $Source $final /E /MOVE /COPY:DAT /DCOPY:DAT /R:1 /W:1 /NFL /NDL /NJH /NJS /NP /XJ 2>&1
     $code = $LASTEXITCODE
-    if ($code -ge 8) { return [pscustomobject]@{ Status = 'FAILED'; Final = $final; Note = "robocopy exit $code" } }
+    if ($code -ge 16 -and -not (Test-Path -LiteralPath $final)) { return [pscustomobject]@{ Status = 'FAILED'; Final = $final; Note = "robocopy exit $code" } }
     if (Test-Path -LiteralPath $Source) {
         $left = @(Get-ChildItem -LiteralPath $Source -Recurse -File -Force -ErrorAction SilentlyContinue).Count
-        if ($left -gt 0) { return [pscustomobject]@{ Status = 'PARTIAL'; Final = $final; Note = "$left файлов не перенесено (заняты?)" } }
+        if ($left -gt 0) { return [pscustomobject]@{ Status = 'PARTIAL'; Final = $final; Note = "$left файлов не перенесено (заняты?), robocopy exit $code" } }
         Remove-Item -LiteralPath $Source -Recurse -Force -ErrorAction SilentlyContinue
     }
+    if ($code -ge 8) { return [pscustomobject]@{ Status = 'PARTIAL'; Final = $final; Note = "robocopy exit $code" } }
     return [pscustomobject]@{ Status = 'OK'; Final = $final; Note = '' }
 }
 

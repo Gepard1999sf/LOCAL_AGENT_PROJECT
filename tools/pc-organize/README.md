@@ -7,6 +7,7 @@
 | --- | --- | --- |
 | `Invoke-PcAudit.ps1` | Полный аудит: диски, папки по размерам, AppData и кэши, программы, автозагрузка, игры/движки, Docker/WSL, «Загрузки», рабочий стол, документы, проекты, большие файлы, рекомендации | нет |
 | `Invoke-PcOrganize.ps1` | Раскладывает файлы по фиксированной структуре (ниже). По умолчанию — только план; `-Apply` выполняет, `-Undo` откатывает | только с `-Apply` |
+| `Invoke-PcRecycle.ps1` | Отправляет кандидатов «DELETE?» из плана сортировки в Корзину (не удаляет насовсем; слишком большие для Корзины элементы пропускает и называет) | только с `-Apply` |
 | `Invoke-PcCleanup.ps1` | Удаляет пересоздаваемые кэши (шейдеры NVIDIA, дампы WSL, кэш npm/pip, загрузки Unity Hub, старый Temp) | только с `-Apply` |
 
 Отчёты, планы и журналы складываются в `%USERPROFILE%\Desktop\PC-Audit`.
@@ -82,7 +83,18 @@ F:\
   ART BASE\Artbooks, Reference, Drawings, 3D
 ```
 
-## 3. Чистка кэшей
+## 3. Кандидаты на удаление → Корзина
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\pc-organize\Invoke-PcRecycle.ps1 -PlanFile "$env:USERPROFILE\Desktop\PC-Audit\PC-Organize-Plan-<дата>.csv"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\pc-organize\Invoke-PcRecycle.ps1 -PlanFile "..." -Apply
+```
+
+Берёт строки `DELETE?` из плана и отправляет их в Корзину (журнал `PC-Recycle-Journal-<дата>.csv`).
+Элементы крупнее лимита Корзины своего диска (например образ Docker на 53 ГБ) не трогает и
+перечисляет: их удаляют вручную. Место освобождается после очистки Корзины.
+
+## 4. Чистка кэшей
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\pc-organize\Invoke-PcCleanup.ps1          # показать
