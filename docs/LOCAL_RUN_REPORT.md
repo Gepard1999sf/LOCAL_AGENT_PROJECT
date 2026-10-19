@@ -14,7 +14,7 @@
 | 2. Сборка и первый запуск | частично | `npm ci` (246 пакетов), `npx tsc --noEmit`, `npm run build` — зелёные; `npm run tauri dev` собрал Rust за 1 мин 47 с (инкрементально, target на D:) и запустил `codewhale-desktop.exe`, `codewhale-app-server.exe` поднялся. Окно, модель в заголовке и ответ в чате не проверены: приложение было закрыто до визуальной проверки. На Windows также зелёные `cargo clippy -- -D warnings` и `cargo test` (47 тестов) | `npx tsc --noEmit`, `npm run build` (Vite), `cargo clippy -- -D warnings`, `cargo test` (47 тестов) — зелёные под Linux |
 | 3. Настройки приложения | готово | `%APPDATA%\net.codewhale.desktop\settings.json` (резервная копия `settings.json.bak-20261016`): `defaultModel` = `qwen3-4b-32k:latest` (инструменты, `num_ctx` 32768), `knowledgeDrive.root` = `F:\AI_Drive`, `godotPath` = `F:\PROJECTS\godot-hd\…\godot.windows.editor.x86_64.exe`, `pythonPath` = Python 3.14 (не алиас Store), `autoApprove.ai_drive` = true, `workspace` = `F:\AI\CodeWhale\LOCAL_AGENT_PROJECT\Godot\WaterDemo`. Записано напрямую в JSON при закрытом приложении; в окне настроек не проверялось | — |
 | 4. Диск знаний | частично | Готово без GUI: структура `F:\AI_Drive` (все разделы + `.agent_state`), `bin\init-ai-drive.ps1` и `bin\sympy_helper.py`, скиллы `knowledge-drive` и `math-physics-godot` в `~/.codewhale/skills`, запись `ai-drive` в `~/.codewhale/mcp.json` (команда — portable `codewhale-desktop.exe mcp-drive`, env `AI_DRIVE_PATH=F:\AI_Drive`, `GODOT_BIN`, `PYTHON_BIN`, `SYMPY_HELPER`). Проверка из консоли: `mcp-drive status` показывает разделы, Godot и SymPy найдены; `godot_check` на `Godot\WaterDemo\water.gdshader` → `"ok": true, "uniforms": 11`; `math_eval integrate sin(x)**2` → `x/2 - sin(2*x)/4`. `OLLAMA_MODELS` оставлена `D:\AI\ollama\models` (ключ `-KeepOllamaModels`). Не сделано: наполнение (репозитории, дампы Kiwix, докcеты — ждёт решения о загрузке ~5–6 ГБ), индекс git_vault, kiwix-serve, проверка `tool_search → mcp_ai--drive_docset_search` в чате | — |
-| 5. Финальный тест: шейдер воды | не проверено | настоящая модель пишет `water.gdshader`, `godot_check`, `ledger_record`, рендер `D:\water.png` | сквозной тест с `mock_ollama.py` (`docs/FINAL_TEST_WATER.md`) |
+| 5. Финальный тест: шейдер воды | не пройден, причины найдены | Драйвер `e2e/fixtures/live/final_test_water.py --ollama-url` гоняет настоящий CodeWhale с `qwen3-4b-32k`. **Прогон 1** (2026-10-16): агент загрузил скилл, прочитал сцену и материал, записал шейдер на 146 строк без `shader_type` с GLSL-конструкциями; следующий вызов инструмента оборвался по `[stream] open_timeout_secs` = 45 с (подробности ниже). **Прогон 2** (2026-10-17, таймаут 300 с): обрывов нет; агент дважды записал шейдер на 948 байт (снова без `shader_type`), вызвал `tool_search`, но запросы не вернули инструменты `ai-drive` (первый — пусто, второй — `Web` и `apply_patch`), после чего 20 минут искал «godot_check» в вебе; контекст сжимался каждые ~20 с на ~7,5 тыс. токенов, потому что временный дом CodeWhale в драйвере не знал окна 32k; к концу модель потеряла смысл `res://` и создала папку `res/`. Ход не завершился за 1500 с. Отметка драйвера «godot_check вызван» была ложной (совпадение по тексту веб-запросов) — исправляется | сквозной тест с `mock_ollama.py` (`docs/FINAL_TEST_WATER.md`) |
 | 6. ComfyUI: фабрика ассетов | не проверено | `comfy_template_validate`, `generate_ui_icon`, индикатор VRAM, `freedVram: true` | 17/17 против стенда `mock_comfy.py` |
 | 7. Установщик и portable | не проверено | `setup.exe` без прав администратора, SmartScreen, WebView2; portable-zip; статус-точка агента зелёная | релиз v0.1.0 опубликован, SHA-256 сверены |
 
@@ -27,7 +27,7 @@
 | Rust (`rustc -vV`) | rustc 1.99.0 (b940084d7 2026-09-28), host x86_64-pc-windows-msvc, cargo 1.99.0 |
 | Ollama | 0.40.4; `OLLAMA_MODELS=D:\AI\ollama\models`, `OLLAMA_CONTEXT_LENGTH=16384`, `OLLAMA_KV_CACHE_TYPE=q8_0`, `OLLAMA_FLASH_ATTENTION=1` |
 | Модель (тег, `num_ctx`) | `qwen3-4b-32k:latest` (`num_ctx` 32768, из `~/.codewhale/config.toml` и `defaultModel` приложения); запасная `qwen2.5-coder:7b` |
-| ComfyUI | не установлен (папки с `main.py` на дисках нет) |
+| ComfyUI | 0.41.0 portable в `D:\AI\ComfyUI` (Python 3.13.14 встроенный, torch 2.14.0+cu130, CUDA 13.0, архитектуры до sm_120, RTX 5060 Laptop виден); чекпоинт `v1-5-pruned-emaonly.safetensors` (4 265 146 304 байт) в `F:\AI_Drive\AI_ComfyModels\checkpoints` |
 | Godot | 4.8 (custom build, `F:\PROJECTS\godot-hd`) |
 | CodeWhale (`codewhale --version`) | codewhale 0.10.1 (fead51eeea0f), `npm i -g codewhale` |
 | GPU | NVIDIA GeForce RTX 5060 Laptop GPU, 8151 MiB, драйвер 610.62 |
@@ -67,7 +67,29 @@
 - e2e на Windows: `cd codewhale-desktop\e2e; npm ci; .\node_modules\.bin\playwright test` →
   **41 passed (36 s)** с переменной `CW_E2E_CHROMIUM` (см. «Проблемы и обходные пути»).
 
+## Проверки из `docs/research/user-pdf-verification.md`, раздел 5 (на машине пользователя)
+
+| № | Что проверялось | Результат 2026-10-17 |
+| --- | --- | --- |
+| 2 | `godot --headless --editor --script res://tool.gd` с `EditorScript._run()` на сборке 4.8 | **не работает**: `ERROR: Can't load the script "res://tool.gd" as it doesn't inherit from SceneTree or MainLoop`, код выхода 1. Сцены без окна строить только SceneTree-скриптом (как `water_demo.gd`) |
+| 3 | Код возврата `godot --headless --check-only --script bad.gd` при синтаксической ошибке | **1** (`SCRIPT ERROR: Parse Error: Expected expression after "+" operator.`), 0.2 с; на корректном скрипте 0 |
+| 4 | Скорость и загрузка `qwen3-4b-32k` | `ollama ps`: 5,3 ГБ, 100 % GPU, CONTEXT 32768; `ollama run --verbose`: eval 86,8 ток/с на коротком ответе, в ходе агента при контексте 13 тыс. токенов 44–46 ток/с; prompt eval 10 274 токена за 4,25 с |
+| 1, 6 | MoE `qwen3:30b-a3b` на 8 ГБ; `LLAMA_ARG_FIT_TARGET` при открытом Godot | не проверялось: модель не скачана (18 ГБ), редактор Godot в сессии не открывался |
+
 ## Проблемы и обходные пути
+
+- **Обрыв хода агента на длинной записи файла (найдено живым тестом раздела 5).** CodeWhale 0.10.1
+  ждёт первые байты ответа модели `[stream] open_timeout_secs` = 45 с по умолчанию, а Ollama при
+  вызове инструмента (`chat format: peg-native`) отдаёт весь вызов одним блоком в конце генерации.
+  Запись `water.gdshader` на 1 249 токенов заняла 27,7 с и прошла; следующий шаг на ~1 950 токенов
+  при 44 ток/с не укладывался в 45 с, клиент рвал соединение (в `server.log` Ollama восемь
+  запросов ровно по 45,0 с со статусом 500 и `srv stop: cancel task`), три повтора «stream-open»
+  переотправляли тот же промпт, и ход завершился со статусом failed без `godot_check`. Исправление:
+  `[stream] open_timeout_secs = 300` в `~/.codewhale/config.toml` (поставлено; `codewhale config get
+  stream` подтверждает), то же пишет приложение при настройке провайдера и передаёт
+  `CODEWHALE_STREAM_OPEN_TIMEOUT_SECS=300` sidecar'у. Побочный вывод: для 4B-модели файлы лучше
+  писать кусками (скиллы обновлены), а за один вызов инструмента не стоит просить больше ~1 500
+  токенов.
 
 - **Playwright e2e:** `npx playwright install chromium` в `codewhale-desktop\e2e` скачал сборку
   Chromium 1234 (npx подхватил другой Playwright), а `@playwright/test` 1.56.1 ждёт

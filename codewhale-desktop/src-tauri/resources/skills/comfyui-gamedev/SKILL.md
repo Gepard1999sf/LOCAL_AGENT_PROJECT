@@ -30,9 +30,9 @@ invocation: model+user
 | Проверить, что ComfyUI запущен и видит модели | `comfy_status` | — |
 | Какие шаблоны и плейсхолдеры есть | `comfy_templates` | — |
 | Проверить шаблон до запуска (нужные ноды установлены?) | `comfy_template_validate` | `template` |
-| Иконка UI с чистым фоном | `generate_ui_icon` | `prompt`, `save_to` (файл .png в проекте), `size` (256/512) |
+| Иконка UI с чистым фоном | `generate_ui_icon` | `prompt`, `save_to` (файл .png в проекте), `size` 512–1024 (рендер ровно в `size`: меньше 512 — шум) |
 | PBR-материал (albedo [+normal/roughness если шаблон умеет]) + `.tres` для Godot | `generate_pbr_material` | `prompt`, `save_to` (папка/базовое_имя без расширения), `resolution` |
-| Спрайт-лист для AnimatedSprite2D | `generate_sprite_sheet` | `prompt`, `frames`, `columns`, `frame_size`, `save_to` (.png) → ответ содержит `hframes`/`vframes` |
+| Спрайт-лист для AnimatedSprite2D | `generate_sprite_sheet` | `prompt`, `frames`, `columns`, `frame_size` (кадр в атласе, по умолчанию 128), `save_to` (.png) → ответ содержит `hframes`/`vframes` |
 | 3D-проп (.glb) | `generate_3d_prop` | `prompt`, `save_to` (.glb); нужен шаблон `prop3d_api.json` с кастомными нодами |
 | Любой свой шаблон | `comfy_generate` | `template`, `params` (объект плейсхолдер → значение), `save_to` |
 | Найти ноду / её входы | `comfy_nodes_search`, `comfy_node_info` | `query` / `class` |
@@ -40,15 +40,24 @@ invocation: model+user
 | Освободить VRAM / прервать рендер | `comfy_free`, `comfy_interrupt` | — |
 
 ## Порядок работы
-0. Инструменты сервера `comfy` отложенные: если их нет в списке — `tool_search` с запросом `comfy`.
+0. Инструменты сервера `comfy` могут быть отложенными: если `mcp_comfy_generate_ui_icon` нет в списке — один раз
+   `tool_search {"query":"mcp_comfy_comfy_status mcp_comfy_generate_ui_icon mcp_comfy_generate_pbr_material mcp_comfy_generate_sprite_sheet"}`
+   (точные имена: общий запрос отдаёт не больше 8 инструментов и может пропустить `generate_*`).
 1. `comfy_status`: ComfyUI должен быть `online`, иначе попроси пользователя нажать
    «Запустить ComfyUI» в панели «Фабрика ассетов».
-2. Пиши промпт по формуле: *что это* + *стиль игры* + *ракурс* + *фон*. Для иконок: «centered,
-   plain background»; для текстур: «seamless tileable, top-down»; для спрайтов: «side view,
-   consistent character». Негативный промпт по умолчанию уже есть.
+2. Пиши промпт **только на английском** (Stable Diffusion не понимает русский и рисует
+   случайные формы; кириллицу инструмент отклонит) по формуле: *что это* + *стиль игры* +
+   *ракурс* + *фон*. Для иконок: «centered, plain background»; для текстур: «seamless tileable,
+   top-down»; для спрайтов: «side view, consistent character». Негативный промпт по умолчанию
+   уже есть. Размер: 512 для SD 1.5 (`resolution` больше — в разы дольше и с повторами).
+   Иконки проси с `size` 512–1024 (512 для SD 1.5, 1024 для SDXL/Flux): иконка рендерится ровно
+   в этом размере, а меньше 512 SD 1.5 рисует шум; уменьшай готовый PNG уже в Godot.
+   Спрайты: каждый кадр рендерится в 512 (или в `frame_size`, если он больше) и уменьшается до
+   `frame_size` при сборке атласа — `frame_size` 64–128 нормален, это размер кадра, а не рендера.
 3. Сохраняй прямо в проект: иконки в `res://assets/ui/icons/`, текстуры в
-   `res://assets/textures/`, спрайты в `res://assets/sprites/`. Параметр `save_to` — абсолютный
-   путь или путь относительно папки проекта.
+   `res://assets/textures/`, спрайты в `res://assets/sprites/`. Параметр `save_to` — путь
+   `res://…` (сервер находит `project.godot` в рабочей папке), абсолютный путь или путь
+   относительно папки проекта.
 4. После генерации проверь, что файл появился (`read`/`list_dir`), и подключи его: материал
    `.tres` — в `MeshInstance3D.material_override`, спрайт-лист — `hframes`/`vframes` узла
    `Sprite2D`/`AnimatedSprite2D`.

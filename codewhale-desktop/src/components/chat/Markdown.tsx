@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from "react";
+import { lazy, memo, Suspense, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -6,6 +6,9 @@ import { toast } from "sonner";
 import { CodeBlock } from "./CodeBlock";
 import { api } from "../../lib/tauri";
 import { resolvePath } from "../../lib/paths";
+
+// The diagram component and mermaid itself are separate chunks, loaded with the first diagram.
+const MermaidDiagram = lazy(() => import("./MermaidDiagram").then((m) => ({ default: m.MermaidDiagram })));
 
 // Unicode letters: Cyrillic user and folder names are common on Russian Windows.
 const FILE_REF = /^([A-Za-z]:[\\/])?[\p{L}\p{M}\p{N}_.\-\\/]+\.[A-Za-z0-9]{1,8}(:\d+)?$/u;
@@ -39,7 +42,16 @@ function makeComponents(streaming: boolean): Components {
       const text = String(children ?? "");
       // Fenced blocks arrive with a trailing newline and/or a language class.
       if (m || text.includes("\n")) {
-        return <CodeBlock code={text.replace(/\n$/, "")} lang={m?.[1]} streaming={streaming} />;
+        const code = text.replace(/\n$/, "");
+        // A diagram is drawn once the answer is complete; while it streams it is plain source.
+        if (!streaming && m?.[1].toLowerCase() === "mermaid" && code.trim()) {
+          return (
+            <Suspense fallback={<CodeBlock code={code} lang={m[1]} />}>
+              <MermaidDiagram code={code} />
+            </Suspense>
+          );
+        }
+        return <CodeBlock code={code} lang={m?.[1]} streaming={streaming} />;
       }
       return <InlineCode>{children}</InlineCode>;
     },

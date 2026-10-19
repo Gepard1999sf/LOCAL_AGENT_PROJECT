@@ -24,6 +24,14 @@ const LOG_CAPACITY: usize = 500;
 const LAUNCH_PREFIX: &str = "Запуск: ";
 /// `free_port` can lose its port to another process before the server binds it: retry once.
 const START_ATTEMPTS: u32 = 2;
+/// `[stream] open_timeout_secs` the app guarantees in config.toml and passes to the sidecar.
+/// CodeWhale waits this long for the first bytes of a model response (default 45 s). Local
+/// Ollama delivers a tool call as one block once the whole call is generated, so a 2000-token
+/// file write at ~45 tok/s took longer than that and the turn was aborted with
+/// "Retry attempt: stream-open ... connection failed before response headers".
+/// CodeWhale 0.10.1 clamps the value to 5..=300 (`codewhale config get stream.open_timeout_secs`
+/// prints 300 for 600), so 300 is the longest wait it allows.
+const STREAM_OPEN_TIMEOUT_SECS: u32 = 300;
 
 #[derive(Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -236,6 +244,12 @@ impl Runtime {
         if let Some(note) = cleanup_stale_owner() {
             self.push_log(app, note);
         }
+        // The server reads config.toml at start, so the stream budget goes in before the spawn.
+        match ensure_stream_config(&codewhale_config_path()) {
+            Ok(Some(note)) => self.push_log(app, note),
+            Ok(None) => {}
+            Err(e) => self.push_log(app, format!("Предупреждение: {e}")),
+        }
 
         let workspace = settings
             .str("workspace")
@@ -309,6 +323,10 @@ impl Runtime {
         cmd.args(["app-server", "--http", "--host", "127.0.0.1", "--port", &port.to_string()])
             .current_dir(workspace)
             .env("CODEWHALE_RUNTIME_TOKEN", &token)
+            // CodeWhale honours this only when config.toml has no `[stream] open_timeout_secs`
+            // or sets it to 0 (checked with `codewhale config get`): the fallback for a config
+            // the app did not edit (not created yet, `stream = {...}` inline table, read error).
+            .env("CODEWHALE_STREAM_OPEN_TIMEOUT_SECS", STREAM_OPEN_TIMEOUT_SECS.to_string())
             .env("NO_COLOR", "1")
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
@@ -476,6 +494,222 @@ fn default_workspace() -> PathBuf {
     if desk.is_dir() { desk } else { home_dir() }
 }
 
+/// CodeWhale's config.toml: `CODEWHALE_CONFIG_PATH` when set (CodeWhale 0.10.1 honours it,
+/// see `codewhale config path`), else `<home>/config.toml`.
+fn codewhale_config_path() -> PathBuf {
+    if let Ok(p) = std::env::var("CODEWHALE_CONFIG_PATH")
+        && !p.trim().is_empty()
+    {
+        return PathBuf::from(p);
+    }
+    codewhale_home().join("config.toml")
+}
+
+/// Makes sure the config at `path` carries `[stream] open_timeout_secs` (see
+/// `STREAM_OPEN_TIMEOUT_SECS` and `ensure_stream_open_timeout`). A missing config is left
+/// alone: CodeWhale creates it on first run and the sidecar env covers the budget until then.
+/// The previous text is kept next to the file as `config.toml.before-desktop-<stamp>`.
+/// Returns a log line when the file was changed.
+fn ensure_stream_config(path: &Path) -> Result<Option<String>, String> {
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(format!("не удалось прочитать {}: {e}", path.display())),
+    };
+    let Some(updated) = ensure_stream_open_timeout(&text) else {
+        return Ok(None);
+    };
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "config.toml".into());
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let backup = path.with_file_name(format!("{name}.before-desktop-{}", utc_stamp(now)));
+    std::fs::copy(path, &backup).map_err(|e| format!("не удалось сохранить копию {}: {e}", backup.display()))?;
+    // Write atomically so a crash mid-write never leaves a truncated config.
+    let tmp = path.with_file_name(format!("{name}.tmp"));
+    std::fs::write(&tmp, updated).map_err(|e| format!("не удалось записать {}: {e}", tmp.display()))?;
+    std::fs::rename(&tmp, path).map_err(|e| format!("не удалось обновить {}: {e}", path.display()))?;
+    Ok(Some(format!(
+        "{name}: установлено [stream] open_timeout_secs = {STREAM_OPEN_TIMEOUT_SECS} (прежний файл: {})",
+        backup.display()
+    )))
+}
+
+/// The config text with `[stream] open_timeout_secs = 300` ensured, or `None` when nothing
+/// has to change. A string-level edit, so the user's comments, layout, line endings and BOM
+/// stay as they are:
+/// - the key is set (to a positive value, or to anything that is not a plain integer): kept,
+///   the user's choice; `0` means "unset" to CodeWhale and becomes 300;
+/// - a `[stream]` table without the key: the key goes right under its header;
+/// - root-level dotted `stream.<key> = ...` lines: `stream.open_timeout_secs = 300` goes before
+///   the first of them (a `[stream]` header after them would be invalid TOML);
+/// - no stream table at all: a `[stream]` table is appended.
+///
+/// A file this edit does not understand (`stream = {...}` inline table, `[[stream]]`, text
+/// ending inside a string or array) is left alone; the sidecar env covers it.
+fn ensure_stream_open_timeout(text: &str) -> Option<String> {
+    let (bom, body) = text.strip_prefix('\u{FEFF}').map_or(("", text), |b| ("\u{FEFF}", b));
+    let nl = match body.find('\n') {
+        Some(i) if body[..i].ends_with('\r') => "\r\n",
+        _ => "\n",
+    };
+    let lines: Vec<&str> = body.split_inclusive('\n').collect();
+    let starts = statement_starts(&lines)?;
+    let mut table = String::new(); // "" is the root table
+    let mut header_at = None; // the `[stream]` header line
+    let mut dotted_at = None; // the first root-level `stream.<key> = ...` line
+    for (i, raw) in lines.iter().enumerate().filter(|&(i, _)| starts[i]) {
+        if let Some((name, array)) = table_header(raw) {
+            if name == "stream" {
+                if array {
+                    return None;
+                }
+                header_at = Some(i);
+            }
+            table = name;
+            continue;
+        }
+        let Some((key, value)) = key_value(raw) else { continue };
+        let key = if table.is_empty() { key } else { format!("{table}.{key}") };
+        if key == "stream.open_timeout_secs" {
+            if raw[value.clone()].replace('_', "").parse::<u64>() != Ok(0) {
+                return None;
+            }
+            let fixed = format!("{}{STREAM_OPEN_TIMEOUT_SECS}{}", &raw[..value.start], &raw[value.end..]);
+            return Some(splice(bom, &lines, i..i + 1, &fixed));
+        }
+        if table.is_empty() && key == "stream" {
+            return None;
+        }
+        if table.is_empty() && key.starts_with("stream.") {
+            dotted_at.get_or_insert(i);
+        }
+    }
+    let (at, new) = match (header_at, dotted_at) {
+        (Some(h), _) => (h + 1, format!("open_timeout_secs = {STREAM_OPEN_TIMEOUT_SECS}{nl}")),
+        (None, Some(d)) => (d, format!("stream.open_timeout_secs = {STREAM_OPEN_TIMEOUT_SECS}{nl}")),
+        (None, None) => {
+            let gap = if lines.is_empty() { "" } else { nl };
+            (
+                lines.len(),
+                format!(
+                    "{gap}# Added by CodeWhale Desktop: local Ollama sends a long tool call as one block once it{nl}\
+                     # is fully generated, so the default 45 s wait for the first bytes aborted turns.{nl}\
+                     [stream]{nl}open_timeout_secs = {STREAM_OPEN_TIMEOUT_SECS}{nl}"
+                ),
+            )
+        }
+    };
+    // Only the last line can lack its line break.
+    let sep = if at > 0 && !lines[at - 1].ends_with('\n') { nl } else { "" };
+    Some(splice(bom, &lines, at..at, &format!("{sep}{new}")))
+}
+
+/// `bom` followed by `lines` with the lines in `range` replaced by `new`.
+fn splice(bom: &str, lines: &[&str], range: std::ops::Range<usize>, new: &str) -> String {
+    let mut out = String::from(bom);
+    out.extend(lines[..range.start].iter().copied());
+    out.push_str(new);
+    out.extend(lines[range.end..].iter().copied());
+    out
+}
+
+/// For each line, whether it starts a TOML statement (a table header or `key = value`) rather
+/// than continuing a multi-line string, array or inline table. `None` when the text ends inside
+/// one of those: the file is broken or beyond this scanner, so it is not edited.
+fn statement_starts(lines: &[&str]) -> Option<Vec<bool>> {
+    let mut starts = Vec::with_capacity(lines.len());
+    let mut open: Option<u8> = None; // quote of an open `"""` / `'''` string
+    let mut depth = 0usize; // `[` / `{` open in a value
+    for line in lines {
+        let at_start = open.is_none() && depth == 0;
+        starts.push(at_start);
+        if at_start && line.trim_start().starts_with('[') {
+            continue; // a table header: its brackets are not a value
+        }
+        let b = line.as_bytes();
+        let mut i = 0;
+        while i < b.len() {
+            let c = b[i];
+            if let Some(q) = open {
+                if q == b'"' && c == b'\\' {
+                    i += 2;
+                } else if b[i..].starts_with(&[q; 3]) {
+                    i += 3;
+                    // `""""` closes with one quote of content: extra quotes belong to the string.
+                    while i < b.len() && b[i] == q {
+                        i += 1;
+                    }
+                    open = None;
+                } else {
+                    i += 1;
+                }
+                continue;
+            }
+            match c {
+                b'#' => break,
+                b'"' | b'\'' if b[i..].starts_with(&[c; 3]) => {
+                    open = Some(c);
+                    i += 2;
+                }
+                b'"' | b'\'' => {
+                    // A single-line string: skip to its closing quote.
+                    i += 1;
+                    while i < b.len() && b[i] != c {
+                        i += if c == b'"' && b[i] == b'\\' { 2 } else { 1 };
+                    }
+                }
+                b'[' | b'{' => depth += 1,
+                b']' | b'}' => depth = depth.saturating_sub(1),
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+    (open.is_none() && depth == 0).then_some(starts)
+}
+
+/// `(name, is_array_table)` of a `[name]` / `[[name]]` header line, the name as a `key_path`.
+fn table_header(raw: &str) -> Option<(String, bool)> {
+    let inner = raw.trim_start().strip_prefix('[')?;
+    let (inner, array) = inner.strip_prefix('[').map_or((inner, false), |i| (i, true));
+    Some((key_path(&inner[..inner.find(']')?]), array))
+}
+
+/// The `key_path` of a `key = value` line and the byte range of its value token (up to
+/// whitespace or a comment).
+fn key_value(raw: &str) -> Option<(String, std::ops::Range<usize>)> {
+    let eq = raw.find('=')?;
+    let value = raw[eq + 1..].trim_start();
+    let start = raw.len() - value.len();
+    let len = value.find(|c: char| c.is_whitespace() || c == '#').unwrap_or(value.len());
+    Some((key_path(&raw[..eq]), start..start + len))
+}
+
+/// A dotted key with the whitespace and quotes removed: ` "stream" . open ` -> `stream.open`.
+/// A quoted key containing a dot is split too; it never names the stream keys looked for.
+fn key_path(key: &str) -> String {
+    key.split('.').map(|p| p.trim().trim_matches(['"', '\''])).collect::<Vec<_>>().join(".")
+}
+
+/// `yyyymmdd-HHMMSS` in UTC for a unix time (backup file names; no date crate in the tree).
+fn utc_stamp(secs: u64) -> String {
+    let (days, rem) = (secs / 86_400, secs % 86_400);
+    let (hh, mm, ss) = (rem / 3600, rem % 3600 / 60, rem % 60);
+    // Civil date from days since 1970-01-01 (H. Hinnant's algorithm).
+    let z = days as i64 + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!("{y:04}{m:02}{d:02}-{hh:02}{mm:02}{ss:02}")
+}
+
 /// Finds the CodeWhale binary: explicit setting, bundled sidecar, npm install, PATH.
 fn resolve_binary(app: &AppHandle, settings: &Settings) -> Option<PathBuf> {
     if let Some(p) = settings.str("codewhalePath") {
@@ -574,4 +808,183 @@ pub fn runtime_status(app: AppHandle) -> RuntimeInfo {
 #[tauri::command]
 pub fn runtime_logs(app: AppHandle) -> Vec<String> {
     app.state::<Runtime>().logs()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const APPENDED: &str = "# Added by CodeWhale Desktop: local Ollama sends a long tool call as one block once it\n\
+                            # is fully generated, so the default 45 s wait for the first bytes aborted turns.\n\
+                            [stream]\nopen_timeout_secs = 300\n";
+
+    fn edit(text: &str) -> Option<String> {
+        ensure_stream_open_timeout(text)
+    }
+
+    #[test]
+    fn stream_table_appended_when_missing() {
+        let text = "provider = \"ollama\"\n\n[providers.ollama]\nmodel = \"qwen3-4b-32k\"\n";
+        assert_eq!(edit(text).expect("changed"), format!("{text}\n{APPENDED}"));
+        assert_eq!(edit("").expect("changed"), APPENDED);
+        // A sub-table or a same-named key elsewhere is not the [stream] table.
+        let text = "[stream.extra]\nx = 1\n[providers]\nstream.open_timeout_secs = 60\n";
+        assert_eq!(edit(text).expect("changed"), format!("{text}\n{APPENDED}"));
+        // `streams` is a different key; a commented-out header does not count.
+        assert_eq!(edit("streams = 1\n").expect("changed"), format!("streams = 1\n\n{APPENDED}"));
+        assert_eq!(edit("#[stream]\n").expect("changed"), format!("#[stream]\n\n{APPENDED}"));
+    }
+
+    #[test]
+    fn file_without_trailing_newline() {
+        let out = edit("provider = \"ollama\"").expect("changed");
+        assert_eq!(out, format!("provider = \"ollama\"\n\n{APPENDED}"));
+        // `[stream]` as the very last line.
+        assert_eq!(edit("[ stream ] # budgets").expect("changed"), "[ stream ] # budgets\nopen_timeout_secs = 300\n");
+        assert_eq!(
+            edit("[stream]\r\nmax_resumes = 2").expect("changed"),
+            "[stream]\r\nopen_timeout_secs = 300\r\nmax_resumes = 2"
+        );
+    }
+
+    #[test]
+    fn key_inserted_inside_the_stream_table() {
+        // Right under the header, not after the next table.
+        let text = "[stream]\nchunk_timeout_secs = 30\n\n[update]\ncheck_for_updates = true\n";
+        assert_eq!(
+            edit(text).expect("changed"),
+            "[stream]\nopen_timeout_secs = 300\nchunk_timeout_secs = 30\n\n[update]\ncheck_for_updates = true\n"
+        );
+        // [stream] as the last table; a commented-out key does not count.
+        let text = "provider = \"ollama\"\n[update]\nx = 1\n[\"stream\"]\n# open_timeout_secs = 0\nmax_resumes = 2\n";
+        assert_eq!(
+            edit(text).expect("changed"),
+            "provider = \"ollama\"\n[update]\nx = 1\n[\"stream\"]\nopen_timeout_secs = 300\n# open_timeout_secs = 0\nmax_resumes = 2\n"
+        );
+    }
+
+    #[test]
+    fn explicit_value_is_kept() {
+        assert_eq!(edit("[stream]\nopen_timeout_secs = 60\n"), None);
+        assert_eq!(edit("[stream]\n  open_timeout_secs=600 # long\n"), None);
+        assert_eq!(edit("[stream]\nopen_timeout_secs = 1_000\n"), None);
+        assert_eq!(edit("[stream]\nopen_timeout_secs = 0x3c\n"), None);
+        assert_eq!(edit("[stream]\n\"open_timeout_secs\" = 60\n"), None);
+        assert_eq!(edit("[other]\nopen_timeout_secs = 0\n[stream]\nopen_timeout_secs = 120\n"), None);
+        assert_eq!(edit("stream.open_timeout_secs = 60\n[x]\n"), None);
+        // The user's live config: LF lines, the last one CRLF.
+        assert_eq!(edit("provider = \"ollama\"\n\n[stream]\nopen_timeout_secs = 300\r\n"), None);
+    }
+
+    #[test]
+    fn zero_is_replaced_keeping_the_line_layout() {
+        let text = "[stream]\n  open_timeout_secs = 0   # unset\r\nmax_resumes = 2\n";
+        assert_eq!(edit(text).expect("changed"), "[stream]\n  open_timeout_secs = 300   # unset\r\nmax_resumes = 2\n");
+        assert_eq!(edit("[stream]\nopen_timeout_secs=0#c").expect("changed"), "[stream]\nopen_timeout_secs=300#c");
+        assert_eq!(
+            edit("\"stream\" . open_timeout_secs = 0\n").expect("changed"),
+            "\"stream\" . open_timeout_secs = 300\n"
+        );
+    }
+
+    #[test]
+    fn crlf_and_bom_are_kept() {
+        let out = edit("provider = \"ollama\"\r\n").expect("changed");
+        assert_eq!(out, format!("provider = \"ollama\"\r\n\r\n{}", APPENDED.replace('\n', "\r\n")));
+        assert_eq!(
+            edit("[stream]\r\nmax_resumes = 2\r\n").expect("changed"),
+            "[stream]\r\nopen_timeout_secs = 300\r\nmax_resumes = 2\r\n"
+        );
+        // The first line's ending wins in a mixed file.
+        assert_eq!(edit("a = 1\nb = 2\r\n").expect("changed"), format!("a = 1\nb = 2\r\n\n{APPENDED}"));
+        // A BOM (PowerShell 5.1 `-Encoding utf8`) does not hide the header and stays first.
+        assert_eq!(
+            edit("\u{FEFF}[stream]\nmax_resumes = 2\n").expect("changed"),
+            "\u{FEFF}[stream]\nopen_timeout_secs = 300\nmax_resumes = 2\n"
+        );
+        assert_eq!(edit("\u{FEFF}").expect("changed"), format!("\u{FEFF}{APPENDED}"));
+        assert_eq!(edit("\u{FEFF}stream.open_timeout_secs = 45\n"), None);
+    }
+
+    #[test]
+    fn root_dotted_stream_keys() {
+        // A [stream] header after `stream.x = ...` would redefine the table: add a dotted key.
+        assert_eq!(
+            edit("provider = \"ollama\"\nstream.chunk_timeout_secs = 5\n[x]\n").expect("changed"),
+            "provider = \"ollama\"\nstream.open_timeout_secs = 300\nstream.chunk_timeout_secs = 5\n[x]\n"
+        );
+        assert_eq!(edit("stream.open_timeout_secs = 0").expect("changed"), "stream.open_timeout_secs = 300");
+        // An inline table is closed to new keys: left to the sidecar env.
+        assert_eq!(edit("stream = { open_timeout_secs = 0 }\n"), None);
+        assert_eq!(edit("stream = { chunk_timeout_secs = 5 }\n"), None);
+    }
+
+    #[test]
+    fn unusual_files_are_left_alone() {
+        assert_eq!(edit("[[stream]]\nmax_resumes = 2\n"), None);
+        assert_eq!(edit("note = \"\"\"\nunterminated\n"), None);
+        assert_eq!(edit("list = [\n  1,\n"), None);
+    }
+
+    #[test]
+    fn multi_line_values_are_not_statements() {
+        // Header- and key-like lines inside multi-line strings are text, not TOML.
+        for q in ["\"\"\"", "'''"] {
+            let text = format!("prompt = {q}\n[stream]\nopen_timeout_secs = 0\n{q}\n");
+            assert_eq!(edit(&text).expect("changed"), format!("{text}\n{APPENDED}"));
+        }
+        // An escaped quote does not close a basic string; `""""` closes it with one quote.
+        let text = "prompt = \"\"\"a \\\"\"\" b\n[stream]\n\"\"\"\"\n[stream]\n";
+        assert_eq!(edit(text).expect("changed"), format!("{text}open_timeout_secs = 300\n"));
+        // A nested array line is not a header; the key after the array is found.
+        assert_eq!(edit("[stream]\nx = [\n  [1, 2],\n  { a = \"]\" },\n]\nopen_timeout_secs = 60\n"), None);
+        // Brackets and comment marks inside strings do not open anything.
+        let text = "a = \"[{#\\\"\"\nb = '['\n[stream]\n";
+        assert_eq!(edit(text).expect("changed"), format!("{text}open_timeout_secs = 300\n"));
+    }
+
+    #[test]
+    fn line_parsing_helpers() {
+        assert_eq!(table_header("[stream]"), Some(("stream".into(), false)));
+        assert_eq!(table_header("  [[hooks . \"x\"]]\n"), Some(("hooks.x".into(), true)));
+        assert_eq!(table_header("[\"stream\"] # c"), Some(("stream".into(), false)));
+        assert_eq!(table_header("key = 1"), None);
+        assert_eq!(key_value("open_timeout_secs = 45 # c\n"), Some(("open_timeout_secs".into(), 20..22)));
+        assert_eq!(key_value("  'a'.b=7"), Some(("a.b".into(), 8..9)));
+        assert_eq!(key_value("[stream]"), None);
+        assert_eq!(statement_starts(&["a = [\n", "1,\n", "]\n", "b = 1"]), Some(vec![true, false, false, true]));
+    }
+
+    #[test]
+    fn config_file_is_backed_up_and_replaced() {
+        let dir = std::env::temp_dir().join(format!("cw-stream-config-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.toml");
+        assert_eq!(ensure_stream_config(&path), Ok(None), "a missing config is not created");
+
+        let original = "provider = \"ollama\"\r\n[stream]\r\nopen_timeout_secs = 0\r\n";
+        std::fs::write(&path, original).unwrap();
+        let note = ensure_stream_config(&path).unwrap().expect("changed");
+        assert!(note.contains("open_timeout_secs = 300"), "{note}");
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "provider = \"ollama\"\r\n[stream]\r\nopen_timeout_secs = 300\r\n"
+        );
+        let names: Vec<String> =
+            std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        let backup = names.iter().find(|n| n.starts_with("config.toml.before-desktop-")).expect("backup");
+        assert_eq!(std::fs::read_to_string(dir.join(backup)).unwrap(), original);
+        assert_eq!(names.len(), 2, "no temporary file left: {names:?}");
+        // The second start finds the key and leaves the file alone.
+        assert_eq!(ensure_stream_config(&path), Ok(None));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn utc_stamp_formats_civil_time() {
+        assert_eq!(utc_stamp(0), "19700101-000000");
+        assert_eq!(utc_stamp(1_700_000_000), "20231114-221320");
+        assert_eq!(utc_stamp(951_782_400), "20000229-000000");
+    }
 }

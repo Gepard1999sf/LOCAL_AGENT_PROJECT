@@ -3,7 +3,8 @@
 #   powershell -NoProfile -ExecutionPolicy Bypass -File init-ai-drive.ps1 -DriveRoot D:\AI_Drive
 # Ключи: -SkipModels -SkipRepos -SkipZim -Math (докачать базу математики и физики), -Full (StackOverflow ~90 ГБ),
 #        -KeepOllamaModels (не трогать OLLAMA_MODELS: модели остаются там, где лежат сейчас).
-# Скрипт идемпотентный: уже скачанное не качает заново, прерванные загрузки докачиваются (BITS).
+# Скрипт идемпотентный: уже скачанное не качает заново, прерванные загрузки докачиваются (BITS);
+# новый выпуск .zim рядом со старым не качается (чтобы обновить книгу, удалите старый файл).
 param(
     [string]$DriveRoot = "D:\AI_Drive",
     [switch]$SkipModels,
@@ -32,6 +33,49 @@ function Download($url, $dest) {
         Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing
         Move-Item $tmp $dest -Force
     }
+}
+
+# Листинги download.kiwix.org: каждый каталог запрашивается один раз за запуск, ошибка -> пустой листинг и предупреждение.
+$script:listings = @{}
+function Get-Listing($url) {
+    if (-not $script:listings.ContainsKey($url)) {
+        try {
+            $script:listings[$url] = (Invoke-WebRequest -Uri $url -UseBasicParsing).Content
+        } catch {
+            Write-Host "  не удалось получить листинг $url ($($_.Exception.Message))" -ForegroundColor Yellow
+            $script:listings[$url] = ""
+        }
+    }
+    return $script:listings[$url]
+}
+
+# Самые свежие .zim из листинга, по одному на книгу. Имена Kiwix: <проект>_<язык>_<выборка>[_<вариант>]_<ГГГГ-ММ>.zim.
+# Вариант mini пропускается; при одной дате полный/maxi лучше nopic.
+function Find-NewestZims($listing, $namePattern) {
+    $names = [regex]::Matches($listing, "href=`"($namePattern)`"") | ForEach-Object { $_.Groups[1].Value } |
+        Where-Object { $_ -notmatch '_mini_' } | Select-Object -Unique
+    $ranked = foreach ($n in $names) {
+        $date = if ($n -match '_(\d{4}-\d{2})\.zim$') { $Matches[1] } else { "0000-00" }
+        $rank = if ($n -match '_nopic_') { 1 } else { 2 }
+        [pscustomobject]@{ Name = $n; Book = (ZimBook $n); Date = $date; Rank = $rank }
+    }
+    $ranked | Group-Object Book | ForEach-Object { $_.Group | Sort-Object Date, Rank | Select-Object -Last 1 -ExpandProperty Name }
+}
+
+# Имя книги без варианта и даты: math.stackexchange.com_en_all_2026-08.zim -> math.stackexchange.com_en_all.
+function ZimBook($name) { return ($name -replace '(_maxi|_nopic|_mini)?_\d{4}-\d{2}\.zim$', '') }
+
+# Качает .zim, если на диске нет никакой версии этой книги. Новый выпуск рядом со старым не качается
+# (повторный запуск не тянет гигабайты молча); чтобы обновить, удалите старый файл и запустите скрипт снова.
+function DownloadZim($dirUrl, $name, $zimDir) {
+    $book = ZimBook $name
+    $local = Get-ChildItem $zimDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '\.zim$' -and (ZimBook $_.Name) -eq $book } | Select-Object -First 1
+    if ($local -and $local.Name -ne $name) {
+        Write-Host "  уже есть $($local.Name); на сервере $name (для обновления удалите старый файл)" -ForegroundColor Yellow
+        return
+    }
+    Download "$dirUrl$name" (Join-Path $zimDir $name)
 }
 
 function Clone($url, $dir) {
@@ -100,27 +144,41 @@ if (-not $SkipZim) {
     $zim = Join-Path $DriveRoot "kiwix_zim"
     $base = "https://download.kiwix.org/zim/stack_exchange"
     # Имена файлов на сервере содержат дату выпуска; берём актуальные из листинга.
-    try {
-        $listing = (Invoke-WebRequest -Uri "$base/" -UseBasicParsing).Content
-    } catch {
-        $listing = ""
-        Write-Host "  не удалось получить листинг $base ($($_.Exception.Message))" -ForegroundColor Yellow
-    }
+    $listing = Get-Listing "$base/"
     $wanted = @("gamedev.stackexchange.com_en_all", "blender.stackexchange.com_en_all")
     if ($Math) { $wanted += @("math.stackexchange.com_en_all", "mathoverflow.net_en_all", "physics.stackexchange.com_en_all", "scicomp.stackexchange.com_en_all") }
     if ($Full) { $wanted += @("stackoverflow.com_en_all") }
     foreach ($w in $wanted) {
         $match = [regex]::Matches($listing, "href=`"($w[^`"]*\.zim)`"") | ForEach-Object { $_.Groups[1].Value } | Sort-Object | Select-Object -Last 1
         if (-not $match) { Write-Host "  в листинге нет $w — откройте $base/ и скачайте вручную" -ForegroundColor Yellow; continue }
-        Download "$base/$match" (Join-Path $zim $match)
+        DownloadZim "$base/" $match $zim
     }
     if ($Math) {
-        Step "Учебники OpenStax (Kiwix, папка other)"
-        try {
-            $other = (Invoke-WebRequest -Uri "https://download.kiwix.org/zim/other/" -UseBasicParsing).Content
-            $m = [regex]::Matches($other, "href=`"(openstax[^`"]*\.zim)`"") | ForEach-Object { $_.Groups[1].Value } | Sort-Object | Select-Object -Last 1
-            if ($m) { Download "https://download.kiwix.org/zim/other/$m" (Join-Path $zim $m) }
-        } catch { Write-Host "  листинг other/ недоступен" -ForegroundColor Yellow }
+        Step "Учебники физики и математики для Kiwix (OpenStax, иначе LibreTexts)"
+        # OpenStax в Kiwix больше не публикуется (нет ни в zim/other/, ни в каталоге library.kiwix.org, проверено в 2026-10),
+        # поэтому для каждого предмета сначала ищем OpenStax, затем LibreTexts. Только английские книги, самые свежие.
+        $textbooks = @(
+            @{ Subject = "физика"; Candidates = @(
+                @{ Label = "OpenStax University/College Physics"; Dir = "other"; Pattern = 'openstax[^"/]*_en_[^"/]*physics[^"/]*\.zim' },
+                @{ Label = "LibreTexts Physics"; Dir = "libretexts"; Pattern = 'libretexts\.org_en_phys(_maxi|_nopic)?_\d{4}-\d{2}\.zim' }) },
+            @{ Subject = "математика"; Candidates = @(
+                @{ Label = "OpenStax Calculus"; Dir = "other"; Pattern = 'openstax[^"/]*_en_[^"/]*calculus[^"/]*\.zim' },
+                @{ Label = "LibreTexts Mathematics"; Dir = "libretexts"; Pattern = 'libretexts\.org_en_math(_maxi|_nopic)?_\d{4}-\d{2}\.zim' }) }
+        )
+        foreach ($t in $textbooks) {
+            $found = @()
+            foreach ($c in $t.Candidates) {
+                $dirUrl = "https://download.kiwix.org/zim/$($c.Dir)/"
+                $found = @(Find-NewestZims (Get-Listing $dirUrl) $c.Pattern)
+                if ($found.Count -gt 0) { Write-Host "  $($t.Subject): $($c.Label)"; break }
+                Write-Host "  $($t.Subject): $($c.Label) нет в $dirUrl" -ForegroundColor Yellow
+            }
+            if ($found.Count -eq 0) {
+                Write-Host "  $($t.Subject): учебник не скачан. Найдите .zim на https://library.kiwix.org и положите в $zim" -ForegroundColor Yellow
+                continue
+            }
+            foreach ($name in $found) { DownloadZim $dirUrl $name $zim }
+        }
     }
 
     Step "kiwix-serve (kiwix-tools для Windows) -> $DriveRoot\bin"
@@ -128,12 +186,16 @@ if (-not $SkipZim) {
     if (-not (Get-ChildItem $bin -Recurse -Filter "kiwix-serve.exe" -ErrorAction SilentlyContinue)) {
         try {
             $tools = (Invoke-WebRequest -Uri "https://download.kiwix.org/release/kiwix-tools/" -UseBasicParsing).Content
-            $zipName = [regex]::Matches($tools, "href=`"(kiwix-tools_win-i686-[^`"]*\.zip)`"") | ForEach-Object { $_.Groups[1].Value } | Sort-Object | Select-Object -Last 1
+            # Сборки win-x86_64 (с 3.8.0) и win-i686: берём самую новую версию, при равной версии x86_64.
+            # Строковая сортировка тут не годится: она выбирала i686-3.7.0-2 вместо x86_64-3.8.1.
+            $zipName = [regex]::Matches($tools, "href=`"(kiwix-tools_win-(x86_64|i686)-(\d+(?:\.\d+)+)(?:-(\d+))?\.zip)`"") | ForEach-Object {
+                [pscustomobject]@{ Name = $_.Groups[1].Value; Version = [version]$_.Groups[3].Value; Build = [int]("0" + $_.Groups[4].Value); X64 = ($_.Groups[2].Value -eq "x86_64") }
+            } | Sort-Object Version, Build, X64 | Select-Object -Last 1 -ExpandProperty Name
             if ($zipName) {
                 $zipPath = Join-Path $bin $zipName
                 Download "https://download.kiwix.org/release/kiwix-tools/$zipName" $zipPath
                 Expand-Archive -Path $zipPath -DestinationPath $bin -Force
-            } else { Write-Host "  не нашёл kiwix-tools_win-i686-*.zip в листинге" -ForegroundColor Yellow }
+            } else { Write-Host "  не нашёл kiwix-tools_win-*.zip в листинге" -ForegroundColor Yellow }
         } catch { Write-Host "  kiwix-tools не скачан: $($_.Exception.Message)" -ForegroundColor Yellow }
     } else { Write-Host "  уже есть" }
 }

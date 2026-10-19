@@ -244,6 +244,16 @@ npm run bundle    # NSIS + MSI в <CARGO_TARGET_DIR>\release\bundle\
   `readOnlyHint` не снимает подтверждение для пользовательских серверов; в Compatibility-рендере
   Godot глубина из `hint_depth_texture` требует `depth * 2.0 - 1.0`.
 
+Запланировано пользователем 2026-10-16 (после основных разделов, см. `PROJECT.md`, раздел 7.5):
+- **Семантический поиск по смыслу** для `ai-drive`: векторный индекс `vectordb/vectors.sqlite`
+  поверх git_vault (эмбеддинги Ollama `nomic-embed-text`, уже установлена), инструмент
+  `semantic_search` с гибридным ранжированием вместе с FTS5, команда `mcp-drive embed`, кнопка в
+  панели «Диск знаний». Черновик модуля с юнит-тестами лежит в ветке
+  `claude/semantic-search-draft` (`src-tauri/src/drive_vec.rs`, ещё не подключён).
+- **Логотип и иконка приложения**: заменить иконки Tauri по умолчанию в `src-tauri/icons/`
+  (`icon.ico`, `icon.icns`, PNG 32/128/256, иконки Store) на фирменный знак CodeWhale Desktop,
+  чтобы окно, панель задач и установщик выглядели презентабельно.
+
 ## 9. Как отчитываться
 
 В конце — короткий отчёт в `docs/LOCAL_RUN_REPORT.md` (заготовка уже в репозитории: таблица

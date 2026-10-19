@@ -14,6 +14,7 @@ use crate::winproc;
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Manager, ipc::Channel};
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -21,14 +22,25 @@ use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
 pub const MCP_SERVER_KEY: &str = "ai-drive";
-const SKILLS: &[&str] = &["knowledge-drive", "math-physics-godot"];
-const HELPERS: &[&str] = &["sympy_helper.py", "init-ai-drive.ps1"];
+const SKILLS: &[&str] = &["knowledge-drive", "math-physics-godot", "explain-concepts"];
+const HELPERS: &[&str] = &[
+    "sympy_helper.py",
+    "init-ai-drive.ps1",
+    "get-docsets.ps1",
+    "get-kiwix-books.ps1",
+    "build-godot-docset.py",
+];
 const DEFAULT_KIWIX_PORT: u16 = 8090;
+/// Where the search for a free port starts when the configured one is taken (8090 is often
+/// held by Docker Desktop).
+const KIWIX_FALLBACK_PORT: u16 = 8091;
 
 /// Helpers the app keeps running (kiwix-serve) and the single index build slot.
 #[derive(Default)]
 pub struct DriveProcs {
     kiwix: Mutex<Option<KiwixProc>>,
+    /// Port of the kiwix-serve the app runs, 0 when none; `drive_env` points KIWIX_URL at it.
+    kiwix_port: AtomicU16,
     index: Mutex<()>,
 }
 
@@ -55,6 +67,8 @@ pub struct AppDriveStatus {
     pub kiwix_running: bool,
     pub kiwix_port: u16,
     pub kiwix_books: Vec<KiwixBook>,
+    /// Set when the Kiwix port answers, but not with an OPDS catalogue (another server there).
+    pub kiwix_error: Option<String>,
     pub index_running: bool,
 }
 
@@ -73,6 +87,9 @@ pub struct KiwixInfo {
     pub url: String,
     pub running: bool,
     pub books: Vec<KiwixBook>,
+    pub port: u16,
+    /// Set when the configured port was busy and another one was used.
+    pub note: Option<String>,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -102,7 +119,7 @@ pub fn drive_env(app: &AppHandle) -> DriveEnv {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(drive_mcp::default_root()));
     let mut env = DriveEnv::new(root);
-    env.kiwix_url = format!("http://127.0.0.1:{}", kiwix_port(&data));
+    env.kiwix_url = format!("http://127.0.0.1:{}", effective_kiwix_port(app, &data));
     env.godot_bin = setting(&data, &["godotPath"])
         .and_then(Value::as_str)
         .map(str::trim)
@@ -139,6 +156,14 @@ pub fn resource_path(app: &AppHandle, rel: &str) -> Option<PathBuf> {
         );
     }
     candidates.into_iter().find(|p| p.exists())
+}
+
+/// The port of the kiwix-serve the app started, else the configured one.
+fn effective_kiwix_port(app: &AppHandle, data: &Value) -> u16 {
+    app.try_state::<DriveProcs>()
+        .map(|p| p.kiwix_port.load(Ordering::Relaxed))
+        .filter(|&p| p != 0)
+        .unwrap_or_else(|| kiwix_port(data))
 }
 
 pub(crate) fn mcp_config_path() -> PathBuf {
@@ -226,12 +251,26 @@ pub async fn drive_status(app: AppHandle) -> AppDriveStatus {
     let env = drive_env(&app);
     let data = app.state::<Settings>().get();
     let mut drive = drive_mcp::drive_status(&env, false);
-    let kiwix_books = kiwix_catalog(&env.kiwix_url).await.unwrap_or_default();
-    let kiwix_online = !kiwix_books.is_empty() || kiwix_catalog(&env.kiwix_url).await.is_ok();
-    drive.kiwix_online = Some(kiwix_online);
+    let catalog = kiwix_catalog(&env.kiwix_url).await;
+    drive.kiwix_online = Some(catalog.is_ok());
+    let kiwix_error = catalog
+        .as_ref()
+        .err()
+        .filter(|e| e.contains(drive_mcp::KIWIX_FOREIGN_SERVER))
+        .cloned();
+    let kiwix_books = catalog.unwrap_or_default();
     let config = read_json_file(&mcp_config_path());
     let procs = app.state::<DriveProcs>();
-    let kiwix_running = procs.kiwix.lock().await.is_some();
+    let kiwix_running = {
+        let mut slot = procs.kiwix.lock().await;
+        if let Some(running) = slot.as_mut()
+            && running.child.try_wait().ok().flatten().is_some()
+        {
+            *slot = None;
+            procs.kiwix_port.store(0, Ordering::Relaxed);
+        }
+        slot.is_some()
+    };
     let index_running = procs.index.try_lock().is_err();
     let ollama_models_env = ollama_models_var().await;
     let models_dir = env.root.join("models");
@@ -253,14 +292,17 @@ pub async fn drive_status(app: AppHandle) -> AppDriveStatus {
         ollama_models_env,
         ollama_models_on_drive,
         skills_installed,
-        helpers_installed: env.root.join("bin/sympy_helper.py").is_file(),
+        helpers_installed: HELPERS
+            .iter()
+            .all(|n| env.root.join("bin").join(n).is_file()),
         godot_check_project: env
             .godot_check_project
             .as_ref()
             .map(|p| p.display().to_string()),
         kiwix_running,
-        kiwix_port: kiwix_port(&data),
+        kiwix_port: effective_kiwix_port(&app, &data),
         kiwix_books,
+        kiwix_error,
         index_running,
         drive,
     }
@@ -438,25 +480,31 @@ pub async fn drive_index_build(
 }
 
 /// Starts `kiwix-serve` from `<root>/bin` on every ZIM in `<root>/kiwix_zim` and waits until
-/// its catalogue answers.
+/// its catalogue answers. When the configured port is taken by another program, the next free
+/// port from 8091 up is used and reported; the registered ai-drive entry in mcp.json gets the
+/// URL of the running server as KIWIX_URL.
 #[tauri::command]
 pub async fn drive_kiwix_start(app: AppHandle) -> Result<KiwixInfo, String> {
     let env = drive_env(&app);
     let data = app.state::<Settings>().get();
-    let port = kiwix_port(&data);
+    let configured = kiwix_port(&data);
     let procs = app.state::<DriveProcs>();
     let mut slot = procs.kiwix.lock().await;
     if let Some(running) = slot.as_mut()
         && running.child.try_wait().ok().flatten().is_none()
     {
-        let books = kiwix_catalog(&env.kiwix_url).await.unwrap_or_default();
+        let url = format!("http://127.0.0.1:{}", running.port);
+        let books = kiwix_catalog(&url).await.unwrap_or_default();
         return Ok(KiwixInfo {
-            url: env.kiwix_url.clone(),
+            url,
             running: true,
             books,
+            port: running.port,
+            note: None,
         });
     }
     *slot = None;
+    procs.kiwix_port.store(0, Ordering::Relaxed);
     let exe = find_kiwix_serve(&env.root.join("bin")).ok_or_else(|| {
         format!("kiwix-serve не найден в {}: распакуйте kiwix-tools (download.kiwix.org/release/kiwix-tools/) в папку bin диска", env.root.join("bin").display())
     })?;
@@ -472,6 +520,26 @@ pub async fn drive_kiwix_start(app: AppHandle) -> Result<KiwixInfo, String> {
         return Err(format!(
             "В {} нет файлов .zim",
             env.root.join("kiwix_zim").display()
+        ));
+    }
+    let port = if port_is_free(configured) {
+        configured
+    } else {
+        next_free_port(KIWIX_FALLBACK_PORT, configured).ok_or_else(|| {
+            format!("Порт {configured} занят, и свободного порта начиная с {KIWIX_FALLBACK_PORT} не нашлось")
+        })?
+    };
+    let url = format!("http://127.0.0.1:{port}");
+    let mut notes = Vec::new();
+    if port != configured {
+        // Say what holds the port: an older kiwix-serve or another server (Docker likes 8090).
+        let holder = match kiwix_catalog(&format!("http://127.0.0.1:{configured}")).await {
+            Ok(_) => "другой kiwix-serve (не запущенный приложением)",
+            Err(e) if e.contains(drive_mcp::KIWIX_FOREIGN_SERVER) => drive_mcp::KIWIX_FOREIGN_SERVER,
+            Err(_) => "занят другой программой",
+        };
+        notes.push(format!(
+            "Порт {configured}: {holder}; kiwix-serve запущен на порту {port}."
         ));
     }
     let mut cmd = Command::new(&exe);
@@ -500,17 +568,34 @@ pub async fn drive_kiwix_start(app: AppHandle) -> Result<KiwixInfo, String> {
     let stderr = child.stderr.take();
     let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
     loop {
-        if let Ok(books) = kiwix_catalog(&env.kiwix_url).await {
+        let catalog = kiwix_catalog(&url).await;
+        if let Err(e) = &catalog
+            && e.contains(drive_mcp::KIWIX_FOREIGN_SERVER)
+        {
+            let _ = child.kill().await;
+            return Err(e.clone());
+        }
+        if let Ok(books) = catalog {
             *slot = Some(KiwixProc {
                 child,
                 port,
                 #[cfg(windows)]
                 _job: job,
             });
+            procs.kiwix_port.store(port, Ordering::Relaxed);
+            match set_mcp_kiwix_url(&url) {
+                Ok(true) => notes.push(format!(
+                    "KIWIX_URL в mcp.json теперь {url}: перезапустите агента, чтобы ai-drive его подхватил."
+                )),
+                Ok(false) => {}
+                Err(e) => notes.push(e),
+            }
             return Ok(KiwixInfo {
-                url: env.kiwix_url.clone(),
+                url,
                 running: true,
                 books,
+                port,
+                note: (!notes.is_empty()).then(|| notes.join(" ")),
             });
         }
         if let Ok(Some(status)) = child.try_wait() {
@@ -537,6 +622,7 @@ pub async fn drive_kiwix_start(app: AppHandle) -> Result<KiwixInfo, String> {
 pub async fn drive_kiwix_stop(app: AppHandle) -> Result<bool, String> {
     let procs = app.state::<DriveProcs>();
     let mut slot = procs.kiwix.lock().await;
+    procs.kiwix_port.store(0, Ordering::Relaxed);
     let Some(mut proc) = slot.take() else {
         return Ok(false);
     };
@@ -656,23 +742,72 @@ pub fn drive_golden_models() -> Vec<GoldenModel> {
 // Helpers
 // ---------------------------------------------------------------------------------------------
 
+/// Nothing listens on 127.0.0.1:`port` and it can be bound.
+fn port_is_free(port: u16) -> bool {
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    std::net::TcpListener::bind(addr).is_ok()
+        && std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_err()
+}
+
+/// The first free port in `from..` (100 tries), skipping `skip`.
+fn next_free_port(from: u16, skip: u16) -> Option<u16> {
+    (from..from.saturating_add(100))
+        .filter(|&p| p != skip)
+        .find(|&p| port_is_free(p))
+}
+
+/// Points KIWIX_URL of the registered ai-drive entry at `url`; true when the entry changed.
+fn with_kiwix_url(config: &mut Value, url: &str) -> bool {
+    let key = servers_key(config);
+    let Some(vars) = config
+        .get_mut(key)
+        .and_then(|s| s.get_mut(MCP_SERVER_KEY))
+        .and_then(|e| e.get_mut("env"))
+        .and_then(Value::as_object_mut)
+    else {
+        return false;
+    };
+    if vars.get("KIWIX_URL").and_then(Value::as_str) == Some(url) {
+        return false;
+    }
+    vars.insert("KIWIX_URL".into(), json!(url));
+    true
+}
+
+fn set_mcp_kiwix_url(url: &str) -> Result<bool, String> {
+    let path = mcp_config_path();
+    let mut config = read_json_file(&path);
+    if !with_kiwix_url(&mut config, url) {
+        return Ok(false);
+    }
+    write_json_file(&path, &config)?;
+    Ok(true)
+}
+
+/// The books kiwix-serve at `url` lists. Only an OPDS feed counts: any other answer (Docker
+/// and other dev servers like port 8090 too) is an error with `KIWIX_FOREIGN_SERVER` in it.
 async fn kiwix_catalog(url: &str) -> Result<Vec<KiwixBook>, String> {
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_millis(800))
         .timeout(Duration::from_millis(2500))
         .build()
         .map_err(|e| e.to_string())?;
-    let xml = client
-        .get(format!("{url}/catalog/v2/entries"))
+    let resp = client
+        .get(format!("{url}/catalog/v2/entries?count=-1"))
         .send()
         .await
-        .map_err(|e| e.to_string())?
-        .error_for_status()
-        .map_err(|e| e.to_string())?
-        .text()
-        .await
         .map_err(|e| e.to_string())?;
-    Ok(drive_mcp::parse_kiwix_entries(&xml))
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    let body = resp.text().await.map_err(|e| e.to_string())?;
+    if !status.is_success() {
+        return Err(format!("{url}: HTTP {}", status.as_u16()));
+    }
+    drive_mcp::kiwix_catalog_reply(url, content_type.as_deref(), &body)
 }
 
 fn find_kiwix_serve(bin: &Path) -> Option<PathBuf> {
@@ -788,6 +923,51 @@ mod tests {
             Path::new("D:/AI_Drive/models"),
             Path::new("D:/Other/models")
         ));
+    }
+
+    #[test]
+    fn kiwix_url_follows_the_running_server() {
+        let mut config = json!({"servers": {"ai-drive": {"command": "x", "env": {"KIWIX_URL": "http://127.0.0.1:8090", "AI_DRIVE_PATH": "F:/AI_Drive"}}}});
+        assert!(with_kiwix_url(&mut config, "http://127.0.0.1:8092"));
+        assert_eq!(
+            config["servers"]["ai-drive"]["env"]["KIWIX_URL"],
+            "http://127.0.0.1:8092"
+        );
+        assert_eq!(
+            config["servers"]["ai-drive"]["env"]["AI_DRIVE_PATH"],
+            "F:/AI_Drive"
+        );
+        assert!(
+            !with_kiwix_url(&mut config, "http://127.0.0.1:8092"),
+            "unchanged"
+        );
+        let mut legacy = json!({"mcpServers": {"ai-drive": {"env": {}}}});
+        assert!(with_kiwix_url(&mut legacy, "http://127.0.0.1:8091"));
+        assert_eq!(
+            legacy["mcpServers"]["ai-drive"]["env"]["KIWIX_URL"],
+            "http://127.0.0.1:8091"
+        );
+        let mut unregistered = json!({"servers": {"other": {"env": {}}}});
+        assert!(!with_kiwix_url(&mut unregistered, "http://127.0.0.1:8091"));
+        assert!(
+            unregistered["servers"].get("ai-drive").is_none(),
+            "never registers by itself"
+        );
+    }
+
+    #[test]
+    fn busy_ports_are_skipped() {
+        // Not an OS-assigned port: those come from the dynamic range, where Windows reserves
+        // whole blocks for Hyper-V/Docker and the next 100 ports may all be unusable.
+        let busy = next_free_port(20_000, 0).expect("a free port from 20000");
+        let listener = std::net::TcpListener::bind(("127.0.0.1", busy)).unwrap();
+        assert!(!port_is_free(busy));
+        let next = next_free_port(busy, 0).unwrap();
+        assert!(next > busy && port_is_free(next));
+        let skipped = next_free_port(next, next).unwrap();
+        assert_ne!(skipped, next);
+        drop(listener);
+        assert!(port_is_free(busy));
     }
 
     #[test]

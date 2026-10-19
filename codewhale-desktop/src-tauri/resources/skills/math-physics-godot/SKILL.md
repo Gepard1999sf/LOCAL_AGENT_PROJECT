@@ -1,21 +1,39 @@
 ---
 name: math-physics-godot
-description: Эталонные физико-математические паттерны для Godot 4.x (GDScript 2.0 и gdshader) — критически затухающая пружина вместо lerp, Верле и RK4, волны Герстнера с нормалями, плавучесть, подвеска на рейкастах, система координат Godot. Use when: пружина, камера следует, отдача, интегрирование, Verlet, RK4, волна, вода, Gerstner, плавучесть, buoyancy, подвеска, raycast vehicle, нормаль, SDF, Y-up, система координат.
+description: Физика и математика для Godot 4 (GDScript, gdshader) — пружина вместо lerp, Верле, RK4, вода Герстнера с пеной и френелем, плавучесть, подвеска на рейкастах. Use when: пружина, отдача, Verlet, RK4, волна, вода, Gerstner, плавучесть, buoyancy, подвеска, raycast vehicle, нормаль, SDF, Y-up.
 invocation: model+user
 ---
 
-# Математика и физика для Godot 4
+# Физика и математика Godot 4
 
-Все примеры: статическая типизация, API Godot 4 (не 3), `_physics_process(delta)` для физики.
-Точную производную или градиент не выводи «в уме» — вызови `math_eval` с сервера `ai-drive`.
+## Главное (вывод обрезан: нужное здесь и в конце)
+1. Файлы — в КОРЕНЬ проекта (папка с `project.godot`, обычно рабочая): `res://water.gdshader` = `<рабочая папка>/water.gdshader`. Папки `project/`, `res/` не создавай.
+2. Вода: `write` скелета из конца → `mcp_ai--drive_godot_check {"path":"<рабочая папка>/water.gdshader"}` → правка → снова `godot_check`.
+3. В ошибке `(:N)` — номер строки, `Подсказка:`/`Hint:` — что делать. Исправь ровно строку N. Один `edit` — одно изменение.
+4. `edit` не прошёл 2 раза → `read` файла, потом `write` всего файла с переписанной функцией.
+5. «Готово» — только если последний `godot_check` вернул `ok: true`, затем `mcp_ai--drive_ledger_record`. Иначе назови оставшуюся ошибку.
+6. Пиши коротко: 1–2 предложения перед вызовом, без пересказов и повторов.
+7. Скрытый код: `retrieve_tool_result {"ref":"<ref из omitted>","mode":"lines","lines":"38-51"}` (пружина), `"53-76"` (RK4), `"78-107"` (плавучесть, подвеска).
 
-## Система координат
-- Godot: **Y вверх, -Z вперёд**, правая система. `Vector3.FORWARD == Vector3(0, 0, -1)`.
-- Из Blender (Z вверх, Y вперёд): `godot = Vector3(b.x, b.z, -b.y)`.
-- Нормаль из градиента скалярного поля `f(x, y, z)`: `normalize(gradient)`; `math_eval {"mode":"gradient3d", ...}` выдаёт готовый `Vector3(...)`.
+## Оси и шейдеры
+- Инструменты `mcp_ai--drive_*` уже в списке (нет — `tool_search {"query":"mcp_ai-drive_code_search"}`, один дефис);
+  пример шейдера — `mcp_ai--drive_code_search {"query":"shader_type spatial water"}`,
+  `ledger_record` — `{"task_id":"water","script_path":"<путь>","summary":"..."}`. `Web` не нужен.
+- Godot: **Y вверх, -Z вперёд**; `Vector3.FORWARD == Vector3(0, 0, -1)`; `basis.z` — «назад», вперёд `-basis.z`.
+  Из Blender (Z вверх): `Vector3(b.x, b.z, -b.y)`.
+- Нормаль поля/SDF `f(x, y, z)` = `normalize(gradient)`: `math_eval {"mode":"gradient3d","expr":...}` → готовый `Vector3(...)`.
+  Производные — через `math_eval`, не «в уме».
+- GDScript: статическая типизация, API Godot 4, физика в `_physics_process(delta)`; `move_and_slide()` без
+  аргументов, скорость в `velocity`.
+- `.gdshader` — язык Godot, не GLSL: первая строка `shader_type spatial;`; встроенные `VERTEX`, `NORMAL`, `UV`,
+  `TIME`, `ALBEDO`, `ROUGHNESS`, `VIEW`. Нет `gl_FragColor`, `gl_Position`, `texture2D`, `#version`, `main()`.
+  Числа с точкой: `2.0 * x`, `pow(x, 2.0)`; `PI` встроена, не объявляй. `Shader type  not supported` = нет `shader_type spatial;`.
+- Цвет — `ALBEDO`; `COLOR` в spatial только читается («Constants cannot be modified»). `UV` — `vec2`: `vec3(UV, 0.0)`,
+  иначе «Invalid assignment of 'vec2' to 'vec3'». Глобальные переменные — только `uniform`/`const`/`varying`.
 
-## 1. Критически затухающая пружина (камера, отдача, UI) — замена `lerp`
-Не зависит от FPS, не перелетает цель (`zeta = 1`). `omega` ≈ `2π / время_отклика_сек`.
+## Пружина с критическим затуханием (камера, отдача, UI) — вместо `lerp`
+`lerp` каждый кадр зависит от FPS (или `lerp(a, b, 1.0 - exp(-rate * delta))`); пружина — нет и не перелетает
+цель (`zeta = 1`). `omega` ≈ `2π / время_отклика_сек`.
 ```gdscript
 static func spring_damp(current: Vector3, target: Vector3, velocity: Vector3, omega: float, dt: float) -> Array[Vector3]:
 	var exp_term: float = exp(-omega * dt)
@@ -26,18 +44,18 @@ static func spring_damp(current: Vector3, target: Vector3, velocity: Vector3, om
 	var out: Array[Vector3] = [new_pos, new_vel]
 	return out
 ```
-Использование в `_process(delta)`: `var r := spring_damp(position, target.position, _vel, 12.0, delta); position = r[0]; _vel = r[1]`.
+В `_process`: `var r := spring_damp(position, target.position, _vel, 12.0, delta); position = r[0]; _vel = r[1]`.
 
-## 2. Интегрирование: Верле и RK4
-Явный Эйлер (`pos += vel * dt; vel += acc * dt`) накапливает энергию — не используй для пружин и орбит.
+## Интегрирование: Верле и RK4
+Явный Эйлер (`pos += vel * dt; vel += acc * dt`) накапливает энергию — не для пружин и орбит.
 ```gdscript
-# Verlet: хранит предыдущую позицию, стабилен для верёвок/ткани/цепей.
+# Verlet: keeps the previous position; ropes, cloth, chains.
 static func verlet_step(pos: Vector3, prev_pos: Vector3, accel: Vector3, dt: float) -> Array[Vector3]:
 	var next: Vector3 = 2.0 * pos - prev_pos + accel * dt * dt
 	var out: Array[Vector3] = [next, pos]
 	return out
 
-# RK4: accel.call(pos, vel) -> Vector3. Для баллистики с сопротивлением и орбит.
+# RK4: accel.call(pos, vel) -> Vector3; drag ballistics, orbits.
 static func rk4_step(pos: Vector3, vel: Vector3, accel: Callable, dt: float) -> Array[Vector3]:
 	var a1: Vector3 = accel.call(pos, vel)
 	var v2: Vector3 = vel + a1 * (dt * 0.5)
@@ -53,35 +71,7 @@ static func rk4_step(pos: Vector3, vel: Vector3, accel: Callable, dt: float) -> 
 ```
 Сопротивление среды: `accel = Vector3.DOWN * 9.81 - vel * vel.length() * k_drag / mass`.
 
-## 3. Волны Герстнера с корректной нормалью (`.gdshader`, `shader_type spatial`)
-`wave = vec4(dir.x, dir.y, steepness, wavelength)`; сумма крутизн всех волн ≤ 1, иначе петли.
-```glsl
-vec3 gerstner_wave(vec4 wave, vec3 p, inout vec3 tangent, inout vec3 binormal, float t) {
-	float steepness = wave.z;
-	float wavelength = wave.w;
-	float k = 2.0 * PI / wavelength;
-	float c = sqrt(9.8 / k);
-	vec2 d = normalize(wave.xy);
-	float f = k * (dot(d, p.xz) - c * t);
-	float a = steepness / k;
-	tangent += vec3(-d.x * d.x * (steepness * sin(f)), d.x * (steepness * cos(f)), -d.x * d.y * (steepness * sin(f)));
-	binormal += vec3(-d.x * d.y * (steepness * sin(f)), d.y * (steepness * cos(f)), -d.y * d.y * (steepness * sin(f)));
-	return vec3(d.x * (a * cos(f)), a * sin(f), d.y * (a * cos(f)));
-}
-
-void vertex() {
-	vec3 p = VERTEX;
-	vec3 tangent = vec3(1.0, 0.0, 0.0);
-	vec3 binormal = vec3(0.0, 0.0, 1.0);
-	p += gerstner_wave(wave_a, VERTEX, tangent, binormal, TIME);
-	p += gerstner_wave(wave_b, VERTEX, tangent, binormal, TIME);
-	VERTEX = p;
-	NORMAL = normalize(cross(binormal, tangent));
-}
-```
-Проверяй `godot_check` после каждой правки; `uniforms` в ответе должны совпадать с объявленными.
-
-## 4. Плавучесть (Архимед по точкам), вызывать из `_physics_process`
+## Плавучесть (Архимед по точкам), из `_physics_process`
 ```gdscript
 static func apply_buoyancy(body: RigidBody3D, local_points: Array[Vector3], water_y: float, strength: float, damping: float) -> void:
 	var n: float = float(local_points.size())
@@ -95,9 +85,9 @@ static func apply_buoyancy(body: RigidBody3D, local_points: Array[Vector3], wate
 		var force: Vector3 = Vector3.UP * (strength * depth / n) - point_vel * (damping / n)
 		body.apply_force(force, offset)
 ```
-Высоту волны в точке считай той же функцией, что и в шейдере (продублируй формулу в GDScript), иначе лодка «тонет» в видимой воде.
+Высоту волны считай той же формулой, что в шейдере (функция `gerstner` ниже, в GDScript), иначе лодка «тонет».
 
-## 5. Подвеска на рейкастах (Raycast Vehicle)
+## Подвеска на рейкастах (Raycast Vehicle)
 ```gdscript
 static func apply_suspension(body: RigidBody3D, ray: RayCast3D, rest_length: float, stiffness: float, damping: float) -> void:
 	if not ray.is_colliding():
@@ -110,11 +100,41 @@ static func apply_suspension(body: RigidBody3D, ray: RayCast3D, rest_length: flo
 	var force: float = stiffness * compression - damping * point_vel.dot(up)
 	body.apply_force(up * force, offset)
 ```
-`ray.target_position = Vector3(0, -rest_length, 0)`; жёсткость подбирай так, чтобы `stiffness * rest_length * 4 ≈ mass * 9.81 * 2`.
+`ray.target_position = Vector3(0, -rest_length, 0)`; `stiffness * rest_length * 4 ≈ mass * 9.81 * 2`.
 
-## 6. Частые ошибки локальных моделей
-- `move_and_slide()` в Godot 4 без аргументов; скорость в `velocity`.
-- `Transform3D.basis.z` — это «назад»; вперёд `-basis.z`.
-- В шейдере `int * float` — ошибка: пиши `2.0 * x`, `pow(x, 2.0)`.
-- `lerp` каждый кадр — зависимость от FPS; см. пружину выше или `lerp(a, b, 1.0 - exp(-rate * delta))`.
-- Для SDF-нормали бери аналитический градиент (`math_eval gradient3d`), а не конечные разности, если формула известна.
+## Вода: волна `wave = vec4(dir.x, dir.y, steepness, wavelength)`, сумма крутизн ≤ 1
+Нормаль аналитическая: `t` = ∂p/∂x, `b` = ∂p/∂z, `NORMAL = cross(b, t)`. Скелет компилируется (`uniforms: 3`):
+```glsl
+shader_type spatial;
+uniform vec4 wave_a = vec4(1.0, 0.6, 0.25, 12.0);
+uniform vec4 wave_b = vec4(-0.4, 1.0, 0.2, 7.0);
+uniform vec4 wave_c = vec4(0.8, -0.3, 0.15, 4.0);
+varying float crest;
+
+vec3 gerstner(vec4 w, vec3 p, inout vec3 t, inout vec3 b) {
+	float k = 2.0 * PI / w.w;
+	vec2 d = normalize(w.xy);
+	float f = k * (dot(d, p.xz) - sqrt(9.8 / k) * TIME);
+	float s = w.z * sin(f);
+	float c = w.z * cos(f);
+	t += vec3(-d.x * d.x * s, d.x * c, -d.x * d.y * s);
+	b += vec3(-d.x * d.y * s, d.y * c, -d.y * d.y * s);
+	return vec3(d.x * c, s, d.y * c) / k;
+}
+
+void vertex() {
+	vec3 t = vec3(1.0, 0.0, 0.0);
+	vec3 b = vec3(0.0, 0.0, 1.0);
+	vec3 o = gerstner(wave_a, VERTEX, t, b) + gerstner(wave_b, VERTEX, t, b) + gerstner(wave_c, VERTEX, t, b);
+	crest = o.y;
+	VERTEX += o;
+	NORMAL = normalize(cross(b, t));
+}
+
+void fragment() {
+	float fresnel = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
+	float foam = smoothstep(0.2, 0.4, crest);
+	ALBEDO = mix(mix(vec3(0.02, 0.18, 0.4), vec3(0.2, 0.75, 0.85), fresnel), vec3(1.0), foam);
+	ROUGHNESS = mix(0.05, 0.6, foam);
+}
+```

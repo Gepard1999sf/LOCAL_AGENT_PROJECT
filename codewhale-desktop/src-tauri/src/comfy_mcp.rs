@@ -389,6 +389,12 @@ pub fn generate(env: &ComfyEnv, template_name: &str, mut params: Map<String, Val
     default_params(env, &template, &mut params)?;
     let filled = fill_template(&template.text, &params)?;
     let graph: Value = serde_json::from_str(&filled).map_err(|e| e.to_string())?;
+    // Every output lands in the same folder: create it before rendering, so a path the file
+    // system rejects fails in a second instead of after the whole render.
+    let default_dir = env.workflows_dir.join("output");
+    if let Some(dir) = destination(save_to, &default_dir, "asset", 0, 1, "png").parent().filter(|d| !d.as_os_str().is_empty()) {
+        fs::create_dir_all(dir).map_err(|e| format!("Не удалось создать папку {}: {e}. Рендер не запускался: передайте save_to как res://путь в проекте Godot, абсолютный путь или путь относительно проекта.", dir.display()))?;
+    }
 
     let unloaded_llm = if env.unload_llm { unload_ollama(&env.ollama_url) } else { Vec::new() };
 
@@ -403,7 +409,6 @@ pub fn generate(env: &ComfyEnv, template_name: &str, mut params: Map<String, Val
     if outputs.is_empty() {
         return Err(format!("Граф выполнился, но не сохранил ни одного файла (нет нод SaveImage?). prompt_id {prompt_id}"));
     }
-    let default_dir = env.workflows_dir.join("output");
     let prefixes: BTreeMap<&str, &str> = template.save_prefixes.iter().map(|(id, p)| (id.as_str(), p.as_str())).collect();
     let mut files = Vec::new();
     for (i, (node, item)) in outputs.iter().enumerate() {
@@ -488,6 +493,55 @@ pub fn res_path(file: &Path) -> Option<String> {
     Some(format!("res://{}", rel.to_string_lossy().replace('\\', "/")))
 }
 
+/// The Godot project `res://` paths resolve against: `GODOT_PROJECT` when it holds a
+/// `project.godot`, else the working directory or its nearest such ancestor (CodeWhale starts
+/// MCP servers in the workspace).
+fn godot_project_root() -> Option<PathBuf> {
+    let has_project = |d: &Path| d.join("project.godot").is_file();
+    if let Some(p) = std::env::var_os("GODOT_PROJECT").map(PathBuf::from).filter(|p| has_project(p)) {
+        return Some(p);
+    }
+    let cwd = std::env::current_dir().ok()?;
+    cwd.ancestors().find(|d| has_project(d)).map(Path::to_path_buf)
+}
+
+/// `save_to` as a file-system path: `res://a/b.png` → `<project>/a/b.png` (a trailing slash is
+/// kept, it marks a folder); other paths are returned unchanged.
+pub fn resolve_save_to(save_to: &str, project: Option<&Path>) -> Result<String, String> {
+    let s = save_to.trim();
+    let Some(rest) = s.strip_prefix("res://") else { return Ok(s.to_string()) };
+    let root = project.ok_or_else(|| {
+        format!("{s}: путь res:// нужен проект Godot, но project.godot не найден ни в рабочей папке MCP-сервера, ни выше; передайте абсолютный путь")
+    })?;
+    let mut path = root.to_path_buf();
+    path.extend(rest.split(['/', '\\']).filter(|part| !part.is_empty()));
+    let mut out = path.display().to_string();
+    if rest.ends_with(['/', '\\']) {
+        out.push(std::path::MAIN_SEPARATOR);
+    }
+    Ok(out)
+}
+
+/// The `save_to` argument with `res://` resolved against the Godot project.
+fn save_to_arg(args: &Value) -> Result<Option<String>, String> {
+    arg_str(args, "save_to").map(|s| resolve_save_to(s, godot_project_root().as_deref())).transpose()
+}
+
+fn need_save_to(args: &Value) -> Result<String, String> {
+    save_to_arg(args)?.ok_or_else(|| "Нужен параметр save_to".to_string())
+}
+
+/// Stable Diffusion's CLIP text encoder only knows English: a Cyrillic prompt renders random
+/// shapes, so it is refused before the render with a hint the model can act on.
+fn ensure_english(field: &str, text: &str) -> Result<(), String> {
+    if text.chars().any(|c| ('\u{0400}'..='\u{04FF}').contains(&c)) {
+        return Err(format!(
+            "Параметр {field} должен быть на английском: модель Stable Diffusion (CLIP) не понимает кириллицу и рисует случайные формы. Переведи описание на английский (например \"iron sword, fantasy RPG inventory icon, centered, plain background\") и повтори вызов."
+        ));
+    }
+    Ok(())
+}
+
 /// A StandardMaterial3D resource wiring the PBR maps that exist.
 pub fn material_tres(albedo: Option<&str>, normal: Option<&str>, roughness: Option<&str>) -> String {
     let mut ext = Vec::new();
@@ -515,7 +569,14 @@ fn map_kind(prefix: &str) -> Option<&'static str> {
     ["albedo", "normal", "roughness", "metallic", "ao", "height"].into_iter().find(|k| p.contains(k))
 }
 
-/// Tiles `frames` into a `columns`-wide atlas of `frame_size` cells; returns (cols, rows).
+/// Size the sprite-sheet frames are rendered at: Stable Diffusion gives noise below its native
+/// 512, so small atlas cells are rendered at 512 and scaled down by `assemble_sprite_sheet`.
+pub fn sprite_render_size(frame_size: u32) -> u32 {
+    frame_size.max(DEFAULT_SIZE as u32)
+}
+
+/// Tiles `frames` into a `columns`-wide atlas of `frame_size` cells, scaling each frame to the
+/// cell with Lanczos3 (frames come from the render at `sprite_render_size`); returns (cols, rows).
 pub fn assemble_sprite_sheet(frames: &[PathBuf], columns: u32, frame_size: u32, dest: &Path) -> Result<(u32, u32), String> {
     use image::{RgbaImage, imageops};
     if frames.is_empty() {
@@ -593,9 +654,9 @@ pub fn tool_definitions() -> Vec<Value> {
     let n = |d: &str, def: u64| json!({ "type": "integer", "description": d, "default": def, "minimum": 1 });
     let common_gen = |extra: Value| {
         let mut m = json!({
-            "prompt": s("Что сгенерировать: предмет + стиль игры + ракурс + фон"),
-            "save_to": s("Куда сохранить: абсолютный путь или путь внутри проекта Godot"),
-            "negative": s("Негативный промпт (по умолчанию стандартный)"),
+            "prompt": s("Что сгенерировать, на английском (Stable Diffusion не понимает русский): предмет + стиль игры + ракурс + фон"),
+            "save_to": s("Куда сохранить: res://путь в проекте Godot, абсолютный путь или путь относительно проекта"),
+            "negative": s("Негативный промпт на английском (по умолчанию стандартный)"),
             "seed": { "type": "integer", "description": "Seed; без него случайный", "minimum": 0 }
         });
         if let (Some(a), Some(b)) = (m.as_object_mut(), extra.as_object()) {
@@ -626,7 +687,7 @@ pub fn tool_definitions() -> Vec<Value> {
         tool(
             "comfy_generate",
             "Запустить любой шаблон с параметрами. params — объект плейсхолдер → значение (POSITIVE_PROMPT, SEED, WIDTH…); числа подставляются числами. Делает эстафету VRAM, ждёт рендер, скачивает все файлы вывода и освобождает VRAM.",
-            json!({ "template": s("Имя шаблона"), "params": { "type": "object", "description": "Плейсхолдер → значение", "additionalProperties": true }, "save_to": s("Файл (один вывод) или папка"), "timeout_sec": n("Таймаут ожидания рендера", 600) }),
+            json!({ "template": s("Имя шаблона"), "params": { "type": "object", "description": "Плейсхолдер → значение", "additionalProperties": true }, "save_to": s("Файл (один вывод) или папка; res:// — путь в проекте Godot"), "timeout_sec": n("Таймаут ожидания рендера", 600) }),
             &["template"],
             false,
         ),
@@ -634,14 +695,14 @@ pub fn tool_definitions() -> Vec<Value> {
         tool(
             "generate_pbr_material",
             "PBR-текстура по шаблону pbr_material: сохраняет <save_to>_albedo.png (+ _normal/_roughness, если шаблон их выдаёт) и материал <save_to>.tres (StandardMaterial3D) с путями res://.",
-            common_gen(json!({ "resolution": n("Размер текстуры", 1024), "make_tres": { "type": "boolean", "default": true, "description": "Создать .tres" } })),
+            common_gen(json!({ "resolution": n("Размер текстуры: 512 для SD 1.5, 1024 для SDXL/Flux (больше — в разы дольше и с повторами)", 1024), "make_tres": { "type": "boolean", "default": true, "description": "Создать .tres" } })),
             &["prompt", "save_to"],
             false,
         ),
         tool(
             "generate_sprite_sheet",
-            "Спрайт-лист по шаблону sprite_sheet: frames кадров frame_size×frame_size собираются в атлас columns в ряд. Ответ содержит hframes/vframes для Sprite2D/AnimatedSprite2D.",
-            common_gen(json!({ "frames": n("Число кадров", 8), "columns": n("Кадров в ряду", 4), "frame_size": n("Размер кадра", 128) })),
+            "Спрайт-лист по шаблону sprite_sheet: frames кадров рендерятся в max(frame_size, 512) (меньше Stable Diffusion рисует шум), уменьшаются до frame_size×frame_size (Lanczos) и собираются в атлас columns в ряд. Ответ содержит hframes/vframes для Sprite2D/AnimatedSprite2D.",
+            common_gen(json!({ "frames": n("Число кадров", 8), "columns": n("Кадров в ряду", 4), "frame_size": n("Размер кадра в атласе (кадры рендерятся минимум в 512 и уменьшаются)", 128) })),
             &["prompt", "save_to"],
             false,
         ),
@@ -659,8 +720,11 @@ fn pretty(v: &Value) -> String {
 
 fn gen_params(args: &Value, prompt_key: &str) -> Result<Map<String, Value>, String> {
     let mut params = Map::new();
-    params.insert("POSITIVE_PROMPT".into(), json!(need_str(args, prompt_key)?));
+    let prompt = need_str(args, prompt_key)?;
+    ensure_english(prompt_key, prompt)?;
+    params.insert("POSITIVE_PROMPT".into(), json!(prompt));
     if let Some(neg) = arg_str(args, "negative") {
+        ensure_english("negative", neg)?;
         params.insert("NEGATIVE_PROMPT".into(), json!(neg));
     }
     if let Some(seed) = args.get("seed").and_then(Value::as_u64) {
@@ -758,7 +822,7 @@ pub fn call_tool(env: &ComfyEnv, name: &str, args: &Value) -> Result<String, Str
             let template = need_str(args, "template")?;
             let params = args.get("params").and_then(Value::as_object).cloned().unwrap_or_default();
             let timeout = Duration::from_secs(arg_num(args, "timeout_sec", 600, 7200) as u64);
-            let r = generate(env, template, params, arg_str(args, "save_to"), timeout)?;
+            let r = generate(env, template, params, save_to_arg(args)?.as_deref(), timeout)?;
             Ok(pretty(&serde_json::to_value(r).unwrap_or_default()))
         }
         "generate_ui_icon" => {
@@ -766,7 +830,7 @@ pub fn call_tool(env: &ComfyEnv, name: &str, args: &Value) -> Result<String, Str
             let size = arg_num(args, "size", 512, 4096) as u64;
             params.insert("WIDTH".into(), json!(size));
             params.insert("HEIGHT".into(), json!(size));
-            let r = generate(env, "ui_icon", params, Some(need_str(args, "save_to")?), DEFAULT_TIMEOUT)?;
+            let r = generate(env, "ui_icon", params, Some(&need_save_to(args)?), DEFAULT_TIMEOUT)?;
             Ok(pretty(&serde_json::to_value(r).unwrap_or_default()))
         }
         "generate_pbr_material" => {
@@ -774,9 +838,10 @@ pub fn call_tool(env: &ComfyEnv, name: &str, args: &Value) -> Result<String, Str
             let res = arg_num(args, "resolution", 1024, 4096) as u64;
             params.insert("WIDTH".into(), json!(res));
             params.insert("HEIGHT".into(), json!(res));
-            let save_to = need_str(args, "save_to")?;
+            let save_to = need_save_to(args)?;
             let base = PathBuf::from(save_to.trim_end_matches(".png").trim_end_matches(".tres"));
-            let dir = base.parent().map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from("."));
+            // A bare name ("cobblestone") has an empty parent: save next to the working directory, not in the drive root.
+            let dir = base.parent().filter(|p| !p.as_os_str().is_empty()).map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from("."));
             let stem = base.file_name().and_then(|n| n.to_str()).unwrap_or("material").to_string();
             let r = generate(env, "pbr_material", params, Some(&format!("{}{}", dir.display(), std::path::MAIN_SEPARATOR)), DEFAULT_TIMEOUT)?;
             // Rename outputs to <stem>_<map>.png by their SaveImage prefix.
@@ -804,11 +869,18 @@ pub fn call_tool(env: &ComfyEnv, name: &str, args: &Value) -> Result<String, Str
             let frames = arg_num(args, "frames", 8, 64) as u64;
             let columns = arg_num(args, "columns", 4, 64) as u32;
             let frame_size = arg_num(args, "frame_size", 128, 2048) as u32;
+            // SD 1.5 renders noise below its native 512: render at least that and let the atlas
+            // assembly scale each frame down to frame_size.
+            let render_size = sprite_render_size(frame_size);
             params.insert("FRAMES".into(), json!(frames));
-            params.insert("WIDTH".into(), json!(frame_size));
-            params.insert("HEIGHT".into(), json!(frame_size));
-            let save_to = need_str(args, "save_to")?;
-            let dest = PathBuf::from(if save_to.to_ascii_lowercase().ends_with(".png") { save_to.to_string() } else { format!("{save_to}.png") });
+            params.insert("WIDTH".into(), json!(render_size));
+            params.insert("HEIGHT".into(), json!(render_size));
+            let save_to = need_save_to(args)?;
+            let dest = PathBuf::from(if save_to.to_ascii_lowercase().ends_with(".png") { save_to.clone() } else { format!("{save_to}.png") });
+            // The frames render into a temporary folder; check the atlas folder before the render.
+            if let Some(dir) = dest.parent().filter(|d| !d.as_os_str().is_empty()) {
+                fs::create_dir_all(dir).map_err(|e| format!("Не удалось создать папку {}: {e}. Рендер не запускался.", dir.display()))?;
+            }
             let tmp_dir = env.workflows_dir.join("output").join(format!("frames_{}", now_iso().replace(':', "-")));
             let r = generate(env, "sprite_sheet", params, Some(&format!("{}{}", tmp_dir.display(), std::path::MAIN_SEPARATOR)), DEFAULT_TIMEOUT)?;
             let frame_paths: Vec<PathBuf> = r.files.iter().map(|f| PathBuf::from(&f.path)).collect();
@@ -818,8 +890,8 @@ pub fn call_tool(env: &ComfyEnv, name: &str, args: &Value) -> Result<String, Str
         }
         "generate_3d_prop" => {
             let params = gen_params(args, "prompt")?;
-            let save_to = need_str(args, "save_to")?;
-            let r = generate(env, "prop3d", params, Some(save_to), DEFAULT_TIMEOUT)?;
+            let save_to = need_save_to(args)?;
+            let r = generate(env, "prop3d", params, Some(&save_to), DEFAULT_TIMEOUT)?;
             let mesh = r.files.iter().find(|f| { let p = f.path.to_ascii_lowercase(); p.ends_with(".glb") || p.ends_with(".gltf") || p.ends_with(".obj") });
             Ok(pretty(&json!({ "template": r.template, "promptId": r.prompt_id, "seed": r.seed, "files": r.files, "mesh": mesh.map(|f| f.path.clone()), "resPath": mesh.and_then(|f| res_path(Path::new(&f.path))), "elapsedMs": r.elapsed_ms, "freedVram": r.freed_vram })))
         }
@@ -1028,6 +1100,41 @@ mod tests {
     }
 
     #[test]
+    fn res_save_to_resolves_against_the_project() {
+        let root = temp("res");
+        let sep = std::path::MAIN_SEPARATOR;
+        let icon = resolve_save_to("res://assets/ui/icons/sword.png", Some(&root)).unwrap();
+        assert_eq!(PathBuf::from(&icon), root.join("assets").join("ui").join("icons").join("sword.png"));
+        let folder = resolve_save_to(" res://assets/materials/ ", Some(&root)).unwrap();
+        assert!(folder.ends_with(sep), "{folder}");
+        assert_eq!(PathBuf::from(folder.trim_end_matches(sep)), root.join("assets").join("materials"));
+        assert_eq!(resolve_save_to("/abs/x.png", None).unwrap(), "/abs/x.png");
+        assert_eq!(resolve_save_to("assets/x.png", None).unwrap(), "assets/x.png");
+        assert!(resolve_save_to("res://x.png", None).unwrap_err().contains("project.godot"));
+    }
+
+    #[test]
+    fn bad_prompts_and_paths_fail_before_the_render() {
+        // An unused port: reaching ComfyUI would give an "offline" error instead of these.
+        let mut env = ComfyEnv::new(resources());
+        env.url = "http://127.0.0.1:9".into();
+        env.ollama_url = "http://127.0.0.1:9".into();
+        env.checkpoint = Some("sd15.safetensors".into());
+        let err = call_tool(&env, "generate_ui_icon", &json!({ "prompt": "железный меч", "save_to": "/tmp/x.png" })).unwrap_err();
+        assert!(err.contains("на английском"), "{err}");
+        let err = call_tool(&env, "generate_ui_icon", &json!({ "prompt": "sword", "negative": "размытый", "save_to": "/tmp/x.png" })).unwrap_err();
+        assert!(err.contains("negative"), "{err}");
+        // A folder that cannot be created: a regular file sits where a folder is needed.
+        let dir = temp("badpath");
+        fs::write(dir.join("file"), b"x").unwrap();
+        let bad = dir.join("file").join("sub").join("sword.png");
+        for tool in ["generate_ui_icon", "generate_sprite_sheet", "generate_pbr_material"] {
+            let err = call_tool(&env, tool, &json!({ "prompt": "iron sword", "save_to": bad.display().to_string() })).unwrap_err();
+            assert!(err.contains("Рендер не запускался"), "{tool}: {err}");
+        }
+    }
+
+    #[test]
     fn sprite_sheet_assembly() {
         let dir = temp("sheet");
         let mut frames = Vec::new();
@@ -1047,6 +1154,45 @@ mod tests {
         assert_eq!(sheet.get_pixel(17, 1)[0], 40, "second frame in the first row");
         assert_eq!(sheet.get_pixel(1, 17)[0], 160, "fifth frame starts the second row");
         assert_eq!(sheet.get_pixel(40, 20)[3], 0, "empty cells stay transparent");
+    }
+
+    /// The render-at-512-and-scale-down path, without ComfyUI: 512² frames with four coloured
+    /// quadrants land in 128² cells with the quadrants (and the frame order) intact.
+    #[test]
+    fn sprite_frames_render_large_and_scale_down() {
+        assert_eq!(sprite_render_size(128), 512);
+        assert_eq!(sprite_render_size(32), 512);
+        assert_eq!(sprite_render_size(768), 768);
+        let dir = temp("sheet-scale");
+        let render = sprite_render_size(128);
+        let mut frames = Vec::new();
+        for i in 0..3u8 {
+            let p = dir.join(format!("frame_{i}.png"));
+            let img = image::RgbaImage::from_fn(render, render, |x, y| {
+                let (left, top) = (x < render / 2, y < render / 2);
+                match (left, top) {
+                    (true, true) => image::Rgba([255, 0, i * 50, 255]),
+                    (false, true) => image::Rgba([0, 255, i * 50, 255]),
+                    (true, false) => image::Rgba([0, 0, 255, 255]),
+                    (false, false) => image::Rgba([255, 255, 255, 0]),
+                }
+            });
+            img.save(&p).unwrap();
+            frames.push(p);
+        }
+        let dest = dir.join("sheet.png");
+        assert_eq!(assemble_sprite_sheet(&frames, 2, 128, &dest).unwrap(), (2, 2));
+        let sheet = image::open(&dest).unwrap().to_rgba8();
+        assert_eq!((sheet.width(), sheet.height()), (256, 256));
+        for (i, (cx, cy)) in [(0u32, 0u32), (128, 0), (0, 128)].into_iter().enumerate() {
+            let px = |dx: u32, dy: u32| *sheet.get_pixel(cx + dx, cy + dy);
+            let blue = i as u8 * 50;
+            assert_eq!(px(32, 32), image::Rgba([255, 0, blue, 255]), "frame {i}: top-left red");
+            assert_eq!(px(96, 32), image::Rgba([0, 255, blue, 255]), "frame {i}: top-right green");
+            assert_eq!(px(32, 96), image::Rgba([0, 0, 255, 255]), "frame {i}: bottom-left blue");
+            assert_eq!(px(96, 96)[3], 0, "frame {i}: transparent quadrant stays transparent");
+        }
+        assert_eq!(sheet.get_pixel(200, 200)[3], 0, "the empty fourth cell");
     }
 
     #[test]

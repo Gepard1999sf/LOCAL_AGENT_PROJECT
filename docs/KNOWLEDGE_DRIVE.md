@@ -36,7 +36,9 @@ CodeWhale Desktop даёт агенту доступ к диску через в
    `-Full` (полный StackOverflow, ~90 ГБ), `-SkipModels`, `-SkipRepos`, `-SkipZim`.
    Скрипт идемпотентный: повторный запуск докачивает только недостающее (BITS умеет докачку).
 4. Докcеты Zeal: установите Zeal (zealdocs.org), скачайте нужные докcеты и скопируйте папки
-   `*.docset` из `%APPDATA%\Zeal\Zeal\docsets` в `D:\AI_Drive\docsets`.
+   `*.docset` из `%APPDATA%\Zeal\Zeal\docsets` в `D:\AI_Drive\docsets`. Без Zeal:
+   `powershell -NoProfile -ExecutionPolicy Bypass -File D:\AI_Drive\bin\get-docsets.ps1 -DriveRoot D:\AI_Drive`
+   (скрипт появляется в `bin` после кнопки «Подготовить диск»).
 5. В панели **Диск знаний**:
    - **OLLAMA_MODELS → диск**, затем **Перезапустить Ollama** — модели будут храниться на диске;
    - **Построить индекс** — один раз после наполнения `git_vault` (и после обновления репозиториев);
@@ -62,7 +64,8 @@ CodeWhale Desktop даёт агенту доступ к диску через в
    настроек: `%APPDATA%\codewhale-desktop\settings.json` (ключи `knowledgeDrive.root`, `godotPath`).
 3. **Подготовить диск** (`Ctrl+K` → «Диск знаний» → кнопка). Появятся папки `models`, `docsets`,
    `git_vault`, `kiwix_zim`, `math_physics`, `vectordb`, `bin`, `index`, `.agent_state` и файлы
-   `F:\AI_Drive\bin\sympy_helper.py`, `F:\AI_Drive\bin\init-ai-drive.ps1`.
+   `F:\AI_Drive\bin\sympy_helper.py`, `F:\AI_Drive\bin\init-ai-drive.ps1`,
+   `F:\AI_Drive\bin\get-docsets.ps1`.
 4. **Наполнение** (PowerShell 5.1, можно частями; скрипт идемпотентный, прерванные загрузки
    докачиваются через BITS):
    ```powershell
@@ -82,8 +85,13 @@ CodeWhale Desktop даёт агенту доступ к диску через в
    нужные из панели «Модели Ollama»), клонирует `godot`, `godot-demo-projects`, `godot-docs`,
    пример third-person-контроллера (`--depth 1`), скачивает `.zim` с download.kiwix.org и
    `kiwix-tools` для Windows в `bin`, ставит SymPy.
-5. **Докcеты Zeal.** Установить Zeal (zealdocs.org), в нём скачать Godot, C++, Python, GLSL/OpenGL,
-   затем скопировать папки `*.docset` из `%APPDATA%\Zeal\Zeal\docsets` в `F:\AI_Drive\docsets`.
+5. **Докcеты Zeal.** Без установки Zeal — скрипт из `bin` скачивает Godot, C++, Python 3 и
+   OpenGL 4 прямо из каталога Zeal в `F:\AI_Drive\docsets` (другие имена — ключ `-Names`):
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File F:\AI_Drive\bin\get-docsets.ps1 -DriveRoot F:\AI_Drive
+   ```
+   Либо установить Zeal (zealdocs.org), в нём скачать Godot, C++, Python, GLSL/OpenGL, затем
+   скопировать папки `*.docset` из `%APPDATA%\Zeal\Zeal\docsets` в `F:\AI_Drive\docsets`.
    Это даёт инструменты `docset_search` / `docset_read`.
 6. **Модели на диске (по желанию).** Если модели Ollama уже лежат в `%USERPROFILE%\.ollama\models`,
    их можно перенести: кнопка **OLLAMA_MODELS → диск** (или `robocopy` как в `PROJECT.md`,
